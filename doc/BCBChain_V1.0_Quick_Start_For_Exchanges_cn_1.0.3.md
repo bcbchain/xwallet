@@ -2,8 +2,6 @@
 
 **V1.0.3**
 
-
-
 <div STYLE="page-break-after: always;"></div>
 
 # 修订历史
@@ -12,17 +10,14 @@
 | ---------------- | ------------------------------------------------------------ |
 | V1.0.3：2019-1-8 | 定稿                                                         |
 
-
-
 <div STYLE="page-break-after: always;"></div>
 
 [TOC]
 <script src="./github/ltview.js"></script>
 
 <div STYLE="page-break-after: always;"></div>
+
 # 1 引言
-
-
 
 ## 1.1 什么是BCBChain
 
@@ -36,7 +31,7 @@ BCBChain是以Tendermint为基础开发的区块链体系，以系统安全性�
 
 BCBChain钱包类资产与交易所的对接方式需要运行的程序如下：
 
-* bcbXwallet_rpc 
+* bcbXwallet_rpc
 
   BCBChain交易站对接服务程序，是一个提供安全生成钱包私钥并输出访问密钥， 同时提供数字资产交易类简便访问API接口的服务。
 
@@ -51,6 +46,7 @@ BCBChain钱包类资产与交易所的对接方式需要运行的程序如下：
 
 
 <div STYLE="page-break-after: always;"></div>
+
 # 2 软硬件需求
 
 **操作系统**：	Ubuntu 18.04 64 bit 或 CentOS 7 64 bit
@@ -62,8 +58,6 @@ BCBChain钱包类资产与交易所的对接方式需要运行的程序如下：
 ```
 [tmp]# sudo apt-get install ntp
 ```
-
-
 
 <div STYLE="page-break-after: always;"></div>
 
@@ -77,8 +71,6 @@ BCBChain钱包类资产与交易所的对接方式需要运行的程序如下：
 https://wallet.bcbchain.io/public/Xwallet/linux/bcb-Xwallet_1.0.7.5443-x64.tar.gz
 ```
 
-
-
 ## 3.2 解压程序
 
 将下载的安装包放置在临时目录，执行命令：
@@ -86,8 +78,6 @@ https://wallet.bcbchain.io/public/Xwallet/linux/bcb-Xwallet_1.0.7.5443-x64.tar.g
 ```
 [tmp]# tar xvf bcb-Xwallet_1.0.7.5443-x64.tar.gz
 ```
-
- 
 
 ## 3.3 启动程序
 
@@ -99,12 +89,10 @@ https://wallet.bcbchain.io/public/Xwallet/linux/bcb-Xwallet_1.0.7.5443-x64.tar.g
 
 启动后 bcbXwallet_rpc 的监听端口为：37657。
 
-
-
 查看bcb-Xwallet服务程序是否正确执行，可执行如下命令查看：
 
 ```
-[root]# netstat -lnp | grep 37657                                              
+[root]# netstat -lnp | grep 37657
 ```
 
 
@@ -186,23 +174,13 @@ Example：
 }
 ```
 
-
-
-
-
 # 5 编程接口
 
-
-
 ## 5.1 钱包管理接口
-
-
 
 ### 5.1.1 bcb_walletCreate
 
 向 bcbXwallet_rpc 服务提交创建一个新钱包的请求。
-
-
 
 - **Request URI over HTTPS**
 
@@ -253,13 +231,9 @@ Example：
   | walletAddr | Address  | 钱包地址。                                                   |
   | accessKey  |  String  | 钱包访问密钥，该密钥由bcbXwallet_rpc服务随机生成，用于加密钱包对应的私钥，调用方需要妥善保存，丢失将导致私钥无法找回。 |
 
-
-
 ### 5.1.2 bcb_walletExport
 
 向 bcbXwallet_rpc 服务提交导出一个钱包的请求。
-
-
 
 - **Request URI over HTTPS**
 
@@ -378,13 +352,9 @@ Example：
   | walletAddr | Address  | 钱包地址。                                                   |
   | accessKey  |  String  | 钱包访问密钥，该密钥由bcbXwallet_rpc服务随机生成，用于加密钱包对应的私钥，调用方需要妥善保存，丢失将导致私钥无法找回。 |
 
-
-
 ### 5.1.4 bcb_walletList
 
 向 bcbXwallet_rpc 服务提交列出所有钱包信息的请求。
-
-
 
 - **Request URI over HTTPS**
 
@@ -448,8 +418,6 @@ Example：
 ### 5.1.5 bcb_transfer
 
 向 bcbXwallet_rpc 服务提交一次资产转账的请求。
-
-
 
 - **Request URI over HTTPS**
 
@@ -525,8 +493,6 @@ Example：
 
 向 bcbXwallet_rpc 服务提交离线构建一笔资产转账交易的请求。
 
-
-
 - **Request URI over HTTPS**
 
   ```
@@ -583,7 +549,7 @@ Example：
       jVSUffxKgW7aPawnQaVrZ4gwMt6aogUAJjhvnukfPWnxmsybqDgdjgecjsXa94bamPqgPhTTZC9Sz
       b.<1>.YTgiA1gdDGi2L8iCryAn34dXVYKUEdmBxivyHbK57wKpBcX5KrKyn1vdmZTuKKZ7PotCjcb
       ASbesv61VLE8H38TDiopHrs2eHG9z9iEDDyLcN7giLPCgFiLN9LPRiYZgxwpR95echr2bRPbijnKW
-      j" 
+      j"
     }
   }
   ```
@@ -594,19 +560,11 @@ Example：
   | -------- | :------: | ------------------------------------------------------------ |
   | tx       |  String  | 生成的离线交易数据。                                         |
 
-
-
-
-
 ## 5.2 区块链接口
-
-
 
 ### 5.2.1 bcb_blockHeight
 
 向 bcbXwallet_rpc 服务查询区块最新高度。
-
-
 
 - **Request URI over HTTPS**
 
@@ -629,7 +587,6 @@ Example：
   | **语法** | **类型** | **注释**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
   | -------- | :------: | ------------------------------------------------------------ |
   | ——       |    ——    | 不需要参数。                                                 |
-
 
 
 - **Response SUCCESS Example**
@@ -656,8 +613,6 @@ Example：
 
 向 bcbXwallet_rpc 服务查询区块数据。
 
-
-
 - **Request URI over HTTPS**
 
   ```
@@ -682,7 +637,6 @@ Example：
   | **语法** | **类型** | **注释**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
   | -------- | :------: | ------------------------------------------------------------ |
   | height   |  Int64   | 指定区块高度，为0时返回最新高度的区块信息。                  |
-
 
 
 - **Response SUCCESS Example**
@@ -764,13 +718,9 @@ Example：
   | &nbsp;&nbsp;}                                  |              |                                                              |
   | ]                                              |              |                                                              |
 
-
-
 ### 5.2.3 bcb_transaction
 
 向 bcbXwallet_rpc 服务查询交易数据。
-
-
 
 - **Request URI over HTTPS**
 
@@ -853,13 +803,9 @@ Example：
   | &nbsp;&nbsp;}                                  |              |                                                              |
   | ]                                  |              |                                                              |
 
-
-
 ### 5.2.4 bcb_balance
 
 向 bcbXwallet_rpc 服务查询账户 BCB 币的余额。
-
-
 
 - **Request URI over HTTPS**
 
@@ -885,8 +831,6 @@ Example：
   | **语法** | **类型** | **注释**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
   | -------- | :------: | ------------------------------------------------------------ |
   | address  | Address  | 账户地址。                                                   |
-
-
 
 - **Response SUCCESS Example**
 
@@ -944,7 +888,6 @@ Example：
   | tokenName    |  String  | 代币名称，与代币地址可以二选一，两个都有时必须一致。         |
 
 
-
 - **Response SUCCESS Example**
 
   ```
@@ -997,7 +940,6 @@ Example：
   | address  | Address  | 账户地址。                                                   |
 
 
-
 - **Response SUCCESS Example**
 
   ```
@@ -1032,8 +974,6 @@ Example：
 ### 5.2.7 bcb_nonce
 
 向 bcbXwallet_rpc 服务查询账户在区块链上可用的下一个交易计数值。
-
-
 
 - **Request URI over HTTPS**
 
@@ -1109,7 +1049,7 @@ Example：
       jnKWj"
     }
   }
-  
+
   ```
 
 - **Request Parameters**
@@ -1117,7 +1057,6 @@ Example：
   | **语法** | **类型** | **注释**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
   | -------- | :------: | ------------------------------------------------------------ |
   | tx       |  String  | 交易数据。                                                   |
-
 
 
 - **Response SUCCESS Example**
@@ -1133,7 +1072,7 @@ Example：
     	"height": 234389
     }
   }
-  
+
   ```
 
 - **Response SUCCESS Parameters**
@@ -1146,12 +1085,9 @@ Example：
   | height   |   Int64   | 交易在哪个高度的区块被确认。                                 |
 
 
-
 ### 5.2.9 bcb_version
 
 向 bcbXwallet_rpc 服务查询版本号功能。
-
-
 
 - **Request URI over HTTPS**
 
@@ -1174,7 +1110,6 @@ Example：
   | **语法** | **类型** | **注释**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
   | -------- | :------: | ------------------------------------------------------------ |
   | ——       |    ——    | 不需要参数。                                                 |
-
 
 
 - **Response SUCCESS Example**
@@ -1200,10 +1135,7 @@ Example：
 # 6 bcbXwallet
 
 
-
 bcbXwallet是一个独立的命令行程序，提供了对rpc接口的本地调用封装。便于日常性的诊断、集成，不需要再去构造POST请求。
-
-
 
 ## 6.1 使用方法
 
@@ -1236,11 +1168,7 @@ Flags:
 Use "bcbXwallet [command] --help" for more information about a command.
 ```
 
-
-
 ## 6.2 命令详解
-
-
 
 ### 6.2.1 walletCreate
 
@@ -1287,7 +1215,6 @@ Use "bcbXwallet [command] --help" for more information about a command.
   | accessKey  |  String  | 钱包访问密钥，该密钥由bcbXwallet_rpc服务随机生成，用于加密钱包对应的私钥，调用方需要妥善保存，丢失将导致私钥无法找回。 |
 
 
-
 ### 6.2.2 walletExport
 
 - **command**
@@ -1321,7 +1248,6 @@ Use "bcbXwallet [command] --help" for more information about a command.
   | ---------- | :-------: | ------------------------------------------------------------ |
   | privateKey | HexString | 钱包私钥，根据plainText参数决定导出的是明文还是密文，以 0x 开头。 |
   | walletAddr |  Address  | 钱包地址。                                                   |
-
 
 
 ### 6.2.3 walletImport
@@ -1404,13 +1330,12 @@ Use "bcbXwallet [command] --help" for more information about a command.
   | walletAddr | Address  | 钱包地址。                                                   |
 
 
-
 ### 6.2.5 transfer
 
 - **command**
 
   ```
-  bcbXwallet transfer --name hotwal001 --accessKey  2Rm... --smcAddress bcbLVgb... 
+  bcbXwallet transfer --name hotwal001 --accessKey  2Rm... --smcAddress bcbLVgb...
   --gasLimit 600 [--note hello] --to bcbLocFJG5Q792eLQXhvNkG417kwiaaoPH5a --value 1500000000 [--url https://...]
   ```
 
@@ -1479,7 +1404,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
     "tx": "bcb<tx>.v1.AetboYAmy2TEyUbsR731FTLDLyHE1MVKsSd4v7hS1jFnNkrtmGEVxVmWHR3jVSU
     ffxKgW7aPawnQaVrZ4gwMt6aogUAJjhvnukfPWnxmsybqDgdjgecjsXa94bamPqgPhTTZC9Szb.<1>.YT
     giA1gdDGi2L8iCryAn34dXVYKUEdmBxivyHbK57wKpBcX5KrKyn1vdmZTuKKZ7PotCjcbASbesv61VLE8
-    H38TDiopHrs2eHG9z9iEDDyLcN7giLPCgFiLN9LPRiYZgxwpR95echr2bRPbijnKWj" 
+    H38TDiopHrs2eHG9z9iEDDyLcN7giLPCgFiLN9LPRiYZgxwpR95echr2bRPbijnKWj"
   }
   ```
 
@@ -1879,7 +1804,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
   {
     "version": "1.0.7.9636"
   }
-  
+
   ```
 
 - **Output SUCCESS Result**
@@ -1904,7 +1829,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 ​	用户充币都充值到热钱包，用户提币的时候也是从这个热钱包出。实现内部循环。
 
- 
+
 
 对于交易所而言，主要是考虑如下4个问题：
 
@@ -1940,18 +1865,12 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 ![](./p10/2.无地址标签方案.png)
 
-
-
 ## 7.3 冷钱包向热钱包转账方案
 
 **冷钱包离线转账方案**
 
 ​	当冷钱包需要向热钱包转出代币时，不能通过在线的转账功能完成交易的打包签名操作，此时就需要借助物理上离线的冷钱包进行转账交易的打包及签名。
 
-
-
 具体步骤如下图：
 
 ![](./p10/3.冷钱包向热钱包转账方案.png)
-
- 
