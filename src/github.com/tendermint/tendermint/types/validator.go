@@ -1,0 +1,94 @@
+package types
+
+import (
+	"bytes"
+	"fmt"
+	"github.com/tendermint/go-crypto"
+	cmn "github.com/tendermint/tmlibs/common"
+)
+
+type Validator struct {
+	Address		crypto.Address	`json:"address"`
+	PubKey		crypto.PubKey	`json:"pub_key"`
+	VotingPower	uint64		`json:"voting_power"`
+	RewardAddr	crypto.Address	`json:"reward_addr"`
+	Name		string		`json:"name"`
+
+	Accum	int64	`json:"accum"`
+}
+
+func NewValidator(pubKey crypto.PubKey, votingPower uint64, reward crypto.Address, name string) *Validator {
+	return &Validator{
+		Address:	pubKey.Address(),
+		PubKey:		pubKey,
+		VotingPower:	votingPower,
+		RewardAddr:	reward,
+		Name:		name,
+		Accum:		0,
+	}
+}
+
+func (v *Validator) Copy() *Validator {
+	vCopy := *v
+	return &vCopy
+}
+
+func (v *Validator) CompareAccum(other *Validator) *Validator {
+	if v == nil {
+		return other
+	}
+	if v.Accum > other.Accum {
+		return v
+	} else if v.Accum < other.Accum {
+		return other
+	} else {
+		result := bytes.Compare([]byte(v.Address), []byte(other.Address))
+		if result < 0 {
+			return v
+		} else if result > 0 {
+			return other
+		} else {
+			cmn.PanicSanity("Cannot compare identical validators")
+			return nil
+		}
+	}
+}
+
+func (v *Validator) String() string {
+	if v == nil {
+		return "nil-Validator"
+	}
+	return fmt.Sprintf("Validator{%v %v VP:%v A:%v RW:%v N:%v}",
+		v.Address,
+		v.PubKey,
+		v.VotingPower,
+		v.Accum,
+		v.RewardAddr,
+		v.Name)
+}
+
+func (v *Validator) Hash() []byte {
+	return aminoHash(struct {
+		Address		crypto.Address
+		PubKey		crypto.PubKey
+		VotingPower	uint64
+		RewardAddr	crypto.Address
+		Name		string
+	}{
+		v.Address,
+		v.PubKey,
+		v.VotingPower,
+		v.RewardAddr,
+		v.Name,
+	})
+}
+
+func RandValidator(randPower bool, minPower int64) (*Validator, PrivValidator) {
+	privVal := NewMockPV()
+	votePower := minPower
+	if randPower {
+		votePower += int64(cmn.RandUint32())
+	}
+	val := NewValidator(privVal.GetPubKey(), uint64(votePower), "", "")
+	return val, privVal
+}

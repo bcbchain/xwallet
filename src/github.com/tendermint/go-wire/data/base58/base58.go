@@ -1,0 +1,80 @@
+package base58
+
+import (
+	"math/big"
+	"strings"
+
+	"github.com/pkg/errors"
+)
+
+const BTCAlphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+const FlickrAlphabet = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
+
+var bigRadix = big.NewInt(58)
+var bigZero = big.NewInt(0)
+
+func Decode(b string) ([]byte, error) {
+	return DecodeAlphabet(b, BTCAlphabet)
+}
+
+func Encode(b []byte) string {
+	return EncodeAlphabet(b, BTCAlphabet)
+}
+
+func DecodeAlphabet(b, alphabet string) ([]byte, error) {
+	answer := big.NewInt(0)
+	j := big.NewInt(1)
+
+	for i := len(b) - 1; i >= 0; i-- {
+		tmp := strings.IndexAny(alphabet, string(b[i]))
+		if tmp == -1 {
+			return nil, errors.Errorf("Encountered unknown character: %s", string(b[i]))
+		}
+		idx := big.NewInt(int64(tmp))
+		tmp1 := big.NewInt(0)
+		tmp1.Mul(j, idx)
+
+		answer.Add(answer, tmp1)
+		j.Mul(j, bigRadix)
+	}
+
+	tmpval := answer.Bytes()
+
+	var numZeros int
+	for numZeros = 0; numZeros < len(b); numZeros++ {
+		if b[numZeros] != alphabet[0] {
+			break
+		}
+	}
+	flen := numZeros + len(tmpval)
+	val := make([]byte, flen, flen)
+	copy(val[numZeros:], tmpval)
+
+	return val, nil
+}
+
+func EncodeAlphabet(b []byte, alphabet string) string {
+	x := new(big.Int)
+	x.SetBytes(b)
+
+	answer := make([]byte, 0, len(b)*136/100)
+	for x.Cmp(bigZero) > 0 {
+		mod := new(big.Int)
+		x.DivMod(x, bigRadix, mod)
+		answer = append(answer, alphabet[mod.Int64()])
+	}
+
+	for _, i := range b {
+		if i != 0 {
+			break
+		}
+		answer = append(answer, alphabet[0])
+	}
+
+	alen := len(answer)
+	for i := 0; i < alen/2; i++ {
+		answer[i], answer[alen-1-i] = answer[alen-1-i], answer[i]
+	}
+
+	return string(answer)
+}
