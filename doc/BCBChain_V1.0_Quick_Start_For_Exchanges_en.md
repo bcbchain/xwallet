@@ -16,7 +16,7 @@
 
 BCBChain is a blockchain system based on Tendermint. It is a scalable platform with high stability, based on system security, technological innovation, fast and easy to use, and efficient data transmissions between object to object, and human to object.
 
-For more details, please view document: <BCBChain_V1.0_Program_Reference>.
+For more details, please view 《BCBChain_V1.0_Program_Reference》.
 
 
 
@@ -40,11 +40,11 @@ The relationship of the abovementioned components are described as below.
 <div STYLE="page-break-after: always;"></div>
 # 2 Software and Hardware Requirements
 
-**Operating System**:        Ubuntu 18.04 64 bit or CentOS 7 64 bit
+**Operating System**：       CentOS 7 64 bit
 
-**Hardware**:                       CPU 8core+，Memory16GB+，Harddisk256GB+
+**Hardware**：                      CPU 8core+，Memory16GB+，Harddisk512GB+
 
-**Dependencies**:               NTP service installed 
+**Dependencies**：              NTP service installed 
 
 ```
 [tmp]# sudo apt-get install ntp
@@ -54,14 +54,14 @@ The relationship of the abovementioned components are described as below.
 
 <div STYLE="page-break-after: always;"></div>
 
-# 3 Deployment and Launch Procedures
+# 3 bcbXwallet Deployment
 
 ## 3.1 Installation package download
 
-Download address: 
+Download address：
 
 ```
-https://wallet.bcbchain.io/public/Xwallet/linux/bcb-Xwallet_1.0.7.5443-x64.tar.gz
+https://github.com/bcbchain/xwallet/releases/download/v1.0.12/bcb-Xwallet_1.0.12.10094-x64.tar.gz
 ```
 
 
@@ -71,20 +71,20 @@ https://wallet.bcbchain.io/public/Xwallet/linux/bcb-Xwallet_1.0.7.5443-x64.tar.g
 Place the downloaded package in a temporary folder, then run the following command:
 
 ```
-[tmp]# tar xvf bcb-Xwallet_1.0.7.5443-x64.tar.gz
+[tmp]# tar xvf bcb-Xwallet_1.0.12.10094-x64.tar.gz
 ```
 
  
 
 ## 3.3 Launch Procedures
 
-Enter “bcb-Xwallet_1.0.7.5443-x64” folder，run the following command: 
+Enter “bcb-Xwallet_1.0.7.5443-x64” folder，run the following command：
 
 ```
-[bcb-Xwallet_1.0.7.5443-x64]# ./bcbXwallet_rpc
+[bcb-Xwallet_1.0.12.10094-x64.tar.gz]# ./bcbXwallet_rpc
 ```
 
-After it is started, set the bcbXwallet_rpc listening port to: 37657。
+After it is started, set the bcbXwallet_rpc listening port to：37657。You can change the listening port by modifying the file, "./.config/bcbXwallet.yaml".
 
 Enter the following command to check if bcb-Xwallet service is run correctly:
 
@@ -94,11 +94,82 @@ Enter the following command to check if bcb-Xwallet service is run correctly:
 
 <div STYLE="page-break-after: always;"></div>
 
-# 4 Protocol
+# 4 BCB Node Deployment
+
+## 4.1 Installation package download
+
+Download address：
+
+```
+https://github.com/bcbchain/xwallet/releases/download/v1.0.12/bcb-node_1.0.17.12511.tar.gz
+```
 
 
 
-## 4.1 Protocol Overview
+## 4.2 Decompression Procedures
+
+Place the downloaded package in a temporary folder, then run the following command:
+
+```
+[tmp]# tar xvf bcb-node_1.0.17.12511.tar.gz
+```
+
+ 
+
+## 4.3 Install
+
+### 4.3.1 Install bcchain
+
+Enter “bcbchain_1.0.17.12511” folder，run the following command：
+
+```
+[bcbchain_1.0.17.12511]# ./install
+```
+
+### 4.3.2 Install tmcore
+
+Enter “tmcore_1.0.17.12511” folder，run the following command：
+
+```
+[tmcore_1.0.17.12511]# ./install                                         
+```
+
+Input: 1 (select bcb)；
+
+Input: 3 (select UNOFFICIAL FOLLOWER)；
+
+Input: earth.bcbchain.io, Wait a moment, tmcore will finish installing.
+
+Run the following command, and  if the screen displays the "last_block_height" information, it is successfully installed.
+
+```
+curl localhost:46657/abci_info
+```
+
+### 4.3.3 Sync block
+
+After bcchain and tmcore are successfully installed,  the node will synchronize the blocks. Since the block data is large, the sync block takes about 10 days. We also provide offline block packets. You can download and import, which can speed up the synchronization. The download link is: **http://211.154.140.124:43356/down/**. After downloading, you need put the data package into the specified directory and execute the following command to complete the data import.
+
+```
+systemctl stop tmcore.service
+systemctl stop bcbchain.service
+
+cd /home/tmcore/ && rm data -rf 
+tar xf tmcore_data_20190625.tar.gz
+
+cd /home/bcbchain/ && rm  .appstate.db -rf
+tar xf bcbchain_appstate.db_20190625.tar.gz
+
+systemctl start tmcore.service
+systemctl start bcbchain.service
+
+```
+
+
+
+# 5 Protocol
+
+## 5.1 Protocol Overview
 
 bcbXwallet_rpc server supports the the following PRC communication protocols:
 
@@ -115,16 +186,16 @@ The list of RPC interfaces provided by the bcbXwallet_rpc server is as follows (
 
 <div STYLE="page-break-after: always;"></div>
 
-## 4.2 URI over HTTP
+## 5.2 URI over HTTP
 
 When using the HTTP GET method for RPC requests, the parameters must be URI-encoded. For the URL format of all RPC calls, see the list above. For details about each service and its parameters, refer to the following parts of this section.
 
-## 4.3 JSONRPC over HTTP
+## 5.3 JSONRPC over HTTP
 
 When using HTTP POST and JSONRPC application protocol for requests,  data body format is as follows:
 
 ```json
-Example: 
+Example：
 {
   "jsonrpc": "2.0",
   "id": "dontcare/anything",
@@ -170,15 +241,15 @@ General format of the return data of a failed request is as below (same for all 
 
 
 
-# 5 Programming Interface
+# 6 Programming Interface
 
 
 
-## 5.1 Wallet Management Interface
+## 6.1 Wallet Management Interface
 
 
 
-### 5.1.1 bcb_walletCreate
+### 6.1.1 bcb_walletCreate
 
 Sends a request to bcbXwallet_rpc service to create a new wallet.
 
@@ -233,7 +304,7 @@ Sends a request to bcbXwallet_rpc service to create a new wallet.
 
 
 
-### 5.1.2 bcb_walletExport
+### 6.1.2 bcb_walletExport
 
 Sends a request to bcbXwallet_rpc to export a wallet.
 
@@ -289,11 +360,11 @@ Sends a request to bcbXwallet_rpc to export a wallet.
   | **Parameter** | **Type**  | Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
   | ---------- | :-------: | ------------------------------------------------------------ |
   | privateKey | HexString | Wallet’s private key, in plaintext or encrypted depending on the plainText parameter in the request, with 0x as the header. |
-  | walletAddr |  Address  | Wallet Address                                     |
+  | walletAddr |  Address  | 钱包地址。Wallet Address                                     |
 
 
 
-### 5.1.3 bcb_walletImport
+### 6.1.3 bcb_walletImport
 
 Sends a request to bcbXwallet_rpc  to import a new wallet.
 
@@ -328,7 +399,7 @@ Sends a request to bcbXwallet_rpc  to import a new wallet.
   | name       |  String   | Wallet name, 1-40 characters long, only upper case, lower case, digits, @, _, - , . allowed |
   | privateKey | HexString | Encrypted private key, starting with 0x |
   | password   |  String   | password	String	Password for wallet，8-20 characters long（Any ASCII characters allowed, must contain at least one lower case, one upper case, one number, and one non-alphanumeric character) |
-  | accessKey  |  String   | Access key, optional if plainText is true |
+  | accessKey  |  String   | 钱包访问密钥，plainText为true时，该参数可忽略。Access key, optional if plainText is true |
   | plainText  |   Bool    | Indicates whether the privateKey is plaintext, true for plaintext, and false for ciphertext |
 
 
@@ -350,12 +421,12 @@ Sends a request to bcbXwallet_rpc  to import a new wallet.
 
   | **Parameter**   | **Type** | Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
   | ---------- | :------: | ------------------------------------------------------------ |
-  | walletAddr | Address  | Address of the wallet                              |
+  | walletAddr | Address  | 钱包地址。Address of the wallet                              |
   | accessKey  |  String  | The wallet access key, which is randomly generated by the bcbXwallet_rpc service and used to encrypt the private key corresponding to the wallet. The key needs to be properly stored, as it can no longer be retrieved if lost. |
 
 
 
-### 5.1.4 bcb_walletList
+### 6.1.4 bcb_walletList
 
 Sends a request to bcbXwallet_rpc  to list out all the wallet information
 
@@ -420,7 +491,7 @@ Sends a request to bcbXwallet_rpc  to list out all the wallet information
 
 
 
-### 5.1.5 bcb_transfer
+### 6.1.5 bcb_transfer
 
 Sends a request to bcbXwallet_rpc  to request a single transfer
 
@@ -464,7 +535,7 @@ Sends a request to bcbXwallet_rpc  to request a single transfer
   | &nbsp;&nbsp;gasLimit   |  String  | Gas limit for the transaction                |
   | &nbsp; note            |  String  | Transaction note (max 255 characters) |
   | &nbsp;&nbsp;to         | Address  | Address of recipient                     |
-  | &nbsp;&nbsp;value      |  String  | Amount of currency transferred（Unit: Cong) |
+  | &nbsp;&nbsp;value      |  String  | Amount of currency transferred（Unit：Cong) |
   | }                      |          |                                                              |
 
 
@@ -496,7 +567,7 @@ Sends a request to bcbXwallet_rpc  to request a single transfer
 
 
 
-### 5.1.5 bcb_transferOffline
+### 6.1.5 bcb_transferOffline
 
 Sends a request to bcbXwallet_rpc  to transfer currency offline
 
@@ -540,7 +611,7 @@ Sends a request to bcbXwallet_rpc  to transfer currency offline
   | &nbsp; note            |  String  | Transaction note (max 255 characters) |
   | &nbsp;&nbsp;nonce      |  Uint64  | This value can be obtained through the bcb_nonce interface |
   | &nbsp;&nbsp;to         | Address  | Address of recipient                     |
-  | &nbsp;&nbsp;value      |  String  | Amount of currency transferred（Unit: Cong） |
+  | &nbsp;&nbsp;value      |  String  | Amount of currency transferred（Unit：Cong） |
   | }                      |          |                                                              |
 
 
@@ -571,11 +642,11 @@ Sends a request to bcbXwallet_rpc  to transfer currency offline
 
 
 
-## 5.2 Blockchain Interface
+## 6.2 Blockchain Interface
 
 
 
-### 5.2.1 bcb_blockHeight
+### 6.2.1 bcb_blockHeight
 
 Sends a request to bcbXwallet_rpc to query the latest block height.
 
@@ -623,7 +694,7 @@ Sends a request to bcbXwallet_rpc to query the latest block height.
 
 
 
-### 5.2.2 bcb_block
+### 6.2.2 bcb_block
 
 Sends a request to bcbXwallet_rpc  to query block data.
 
@@ -737,7 +808,7 @@ Sends a request to bcbXwallet_rpc  to query block data.
 
 
 
-### 5.2.3 bcb_transaction
+### 6.2.3 bcb_transaction
 
 Sends a request to bcbXwallet_rpc  to query a transaction details.
 
@@ -826,7 +897,7 @@ Sends a request to bcbXwallet_rpc  to query a transaction details.
 
 
 
-### 5.2.4 bcb_balance
+### 6.2.4 bcb_balance
 
 Sends a request to bcbXwallet_rpc  to check the balance of the account BCB currency.
 
@@ -879,7 +950,7 @@ Sends a request to bcbXwallet_rpc  to check the balance of the account BCB curre
 
 
 
-### 5.2.5 bcb_balanceOfToken
+### 6.2.5 bcb_balanceOfToken
 
 Sends a request to bcbXwallet_rpc  to check the balance of a token.
 
@@ -936,7 +1007,7 @@ Sends a request to bcbXwallet_rpc  to check the balance of a token.
 
 
 
-### 5.2.6 bcb_allBalance
+### 6.2.6 bcb_allBalance
 
 Sends a request to bcbXwallet_rpc  to query all the tokens in an account.
 
@@ -1000,7 +1071,7 @@ Sends a request to bcbXwallet_rpc  to query all the tokens in an account.
 
 
 
-### 5.2.7 bcb_nonce
+### 6.2.7 bcb_nonce
 
 Sends a request to bcbXwallet_rpc  to query the next transaction count value available on the blockchain for the account.
 
@@ -1051,7 +1122,7 @@ Sends a request to bcbXwallet_rpc  to query the next transaction count value ava
 
 
 
-### 5.2.8 bcb_commitTx
+### 6.2.8 bcb_commitTx
 
 Sends a request to bcbXwallet_rpc  to commit a transaction.
 
@@ -1116,7 +1187,7 @@ Sends a request to bcbXwallet_rpc  to commit a transaction.
 
 
 
-### 5.2.9 bcb_version
+### 6.2.9 bcb_version
 
 Sends a request to bcbXwallet_rpc  to query the current version number.
 
@@ -1166,7 +1237,7 @@ Sends a request to bcbXwallet_rpc  to query the current version number.
 
 
 
-# 6 bcbXwallet
+# 7 bcbXwallet
 
 
 
@@ -1174,7 +1245,7 @@ bcbXwallet is a stand-alone command line program that provides a native call wra
 
 
 
-## 6.1 Usage
+## 7.1 Usage
 
 The command runs in the following format:
 
@@ -1207,11 +1278,11 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-## 6.2 Command details
+## 7.2 Command details
 
 
 
-### 6.2.1 walletCreate
+### 7.2.1 walletCreate
 
 - **command**
 
@@ -1221,11 +1292,11 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 - **Input Parameters**
 
-  | **Parameter** | **Type** | Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
-  | ------------- | :------: | ------------------------------------------------------------ |
-  | name          |  String  | Wallet name, 1-40 characters long, only upper case, lower case, digits, @, _, - , . allowed |
-  | password      |  String  | Password for wallet，8-20 characters long（Any ASCII characters allowed, must contain at least one lower case, one upper case, one number, and one non-alphanumeric character) |
-  | url           |  String  | Wallet service address, optional, default local service.     |
+  | **选项** | **Type** | Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
+  | -------- | :------: | ------------------------------------------------------------ |
+  | name     |  String  | Wallet name, 1-40 characters long, only upper case, lower case, digits, @, _, - , . allowed |
+  | password |  String  | Password for wallet，8-20 characters long（Any ASCII characters allowed, must contain at least one lower case, one upper case, one number, and one non-alphanumeric character) |
+  | url      |  String  | 钱包服务地址，可选项，默认调用本地服务。Wallet service address, optional, default local service. |
 
 - **Output FAILED Example**
 
@@ -1252,12 +1323,12 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
   | **Parameter** | **Type** | Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |
   | ---------- | :------: | ------------------------------------------------------------ |
-  | walletAddr | Address  | Wallet Address                                     |
+  | walletAddr | Address  | 钱包地址。Wallet Address                                     |
   | accessKey  |  String  | The wallet access key, which is randomly generated by the bcbXwallet_rpc service and used to encrypt the private key corresponding to the wallet. The key needs to be properly stored, as it can no longer be retrieved if lost. |
 
 
 
-### 6.2.2 walletExport
+### 7.2.2 walletExport
 
 - **command**
 
@@ -1293,7 +1364,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.3 walletImport
+### 7.2.3 walletImport
 
 - **command**
 
@@ -1331,7 +1402,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.4 walletList
+### 7.2.4 walletList
 
 - **command**
 
@@ -1374,7 +1445,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.5 transfer
+### 7.2.5 transfer
 
 - **command**
 
@@ -1418,7 +1489,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.6 transferOffline
+### 7.2.6 transferOffline
 
 - **command**
 
@@ -1460,7 +1531,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.7 blockHeight
+### 7.2.7 blockHeight
 
 - **command**
 
@@ -1490,7 +1561,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.8 block
+### 7.2.8 block
 
 - **command**
 
@@ -1583,7 +1654,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.9 transaction
+### 7.2.9 transaction
 
 - **command**
 
@@ -1655,7 +1726,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.10 balance
+### 7.2.10 balance
 
 - **command**
 
@@ -1686,7 +1757,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.11 balanceOfToken
+### 7.2.11 balanceOfToken
 
 - **command**
 
@@ -1720,7 +1791,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.12 allBalance
+### 7.2.12 allBalance
 
 - **command**
 
@@ -1762,7 +1833,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.13 nonce
+### 7.2.13 nonce
 
 - **command**
 
@@ -1793,7 +1864,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.14 commitTx
+### 7.2.14 commitTx
 
 - **command**
 
@@ -1830,7 +1901,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.14 version
+### 7.2.15 version
 
 - **command**
 
@@ -1861,11 +1932,11 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-# 7 How to Rapidly Setup with the Exchange
+# 8 How to Rapidly Setup with the Exchange
 
 
 
-## 7.1 Setup using Address Labelling
+## 8.1 Setup using Address Labelling
 
 Setup using Address Labelling Explanation:
 
@@ -1888,7 +1959,7 @@ The process details are explained in the diagram below:
 
 
 
-## 7.2 Setup without using Address Labels
+## 8.2 Setup without using Address Labels
 
 **Setup without using address labels explanation:**
 When you don't use the address label feature about BCBChain, you can not distinguish the activities of the users in the account by the exchange hot wallet address. In this case, the user can only be identified by the address. Hence, every user needs to have one unique account and one unique corresponding address, and manually maintain the currencies in their accounts on a periodic basis by spreading the tokens and distributing the allocated tokens back to the hot wallet.
@@ -1905,7 +1976,7 @@ The process details are explained in the diagram below:
 
 
 
-## 7.3 Transfer from cold wallet to hot wallet
+## 8.3 Transfer from cold wallet to hot wallet
 
 **Transfer from cold wallet to hot wallet explanation:**
 

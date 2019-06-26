@@ -40,9 +40,9 @@ BCBChain钱包类资产与交易所的对接方式需要运行的程序如下：
 <div STYLE="page-break-after: always;"></div>
 # 2 软硬件需求
 
-**操作系统**：	Ubuntu 18.04 64 bit 或 CentOS 7 64 bit
+**操作系统**：	CentOS 7 64 bit
 
-**硬件**：		CPU 8核+，内存16GB+，硬盘256GB+
+**硬件**：		CPU 8核+，内存16GB+，硬盘512GB+
 
 **依赖**：		安装NTP服务
 
@@ -50,18 +50,16 @@ BCBChain钱包类资产与交易所的对接方式需要运行的程序如下：
 [tmp]# sudo apt-get install ntp
 ```
 
-
-
 <div STYLE="page-break-after: always;"></div>
 
-# 3 部署和启动程序
+# 3 bcbXwallet部署
 
 ## 3.1 安装包下载
 
 下载地址：
 
 ```
-https://wallet.bcbchain.io/public/Xwallet/linux/bcb-Xwallet_1.0.7.5443-x64.tar.gz
+https://github.com/bcbchain/xwallet/releases/download/v1.0.12/bcb-Xwallet_1.0.12.10094-x64.tar.gz
 ```
 
 
@@ -71,20 +69,20 @@ https://wallet.bcbchain.io/public/Xwallet/linux/bcb-Xwallet_1.0.7.5443-x64.tar.g
 将下载的安装包放置在临时目录，执行命令：
 
 ```
-[tmp]# tar xvf bcb-Xwallet_1.0.7.5443-x64.tar.gz
+[tmp]# tar xvf bcb-Xwallet_1.0.12.10094-x64.tar.gz
 ```
 
  
 
 ## 3.3 启动程序
 
-进入“bcb-Xwallet_1.0.7.5443-x64”目录，执行命令：
+进入“bcb-Xwallet_1.0.12.10094-x64”目录，执行命令：
 
 ```
-[bcb-Xwallet_1.0.7.5443-x64]# ./bcbXwallet_rpc
+[bcb-Xwallet_1.0.12.10094-x64]# ./bcbXwallet_rpc
 ```
 
-启动后 bcbXwallet_rpc 的监听端口为：37657。
+启动后 bcbXwallet_rpc 的监听端口为：37657。你可以打开"./.config/bcbXwallet.yaml"这个文件，修改监听端口。
 
 
 
@@ -94,48 +92,46 @@ https://wallet.bcbchain.io/public/Xwallet/linux/bcb-Xwallet_1.0.7.5443-x64.tar.g
 [root]# netstat -lnp | grep 37657                                              
 ```
 
-# 4 节点程序安装
 
-## 3.1 安装包下载
+
+# 4 全节点部署
+
+## 4.1 安装包下载
 
 下载地址：
 
 ```
-https://wallet.bcbchain.io/public/Xwallet/linux/bcb-Xwallet_1.0.7.5443-x64.tar.gz
+https://github.com/bcbchain/xwallet/releases/download/v1.0.12/bcb-node_1.0.17.12511.tar.gz
 ```
 
 
 
-## 3.2 解压程序
+## 4.2 解压程序
 
 将下载的安装包放置在临时目录，执行命令：
 
 ```
-[tmp]# tar xzf bcb-node_2.0.1.12692-x64.tar.gz
+[tmp]# tar xzf bcb-node_1.0.17.12511.tar.gz
 ```
 
  
 
-## 3.3 安装程序
+## 4.3 安装程序
 
-### 3.3.1 bcchain安装
+### 4.3.1 安装bcchain
 
-进入“bcchain_2.0.1.12692”目录，执行命令：
-
-```
-[bcchain_2.0.1.12692]# ./install
-```
-
-输入1，选择bcb，等待bcchain安装完成。
-
-### 3.3.2 tmcore安装
-
-进入“tmcore_2.0.1.12692”目录，执行命令：
-
-查看bcb-Xwallet服务程序是否正确执行，可执行如下命令查看：
+进入“bcbchain_1.0.17.12511”目录，执行命令
 
 ```
-[tmcore_2.0.1.12692]# ./install                                         
+[bcbchain_1.0.17.12511]# ./install
+```
+
+### 4.3.2安装 tmcore
+
+进入“tmcore_1.0.17.12511”目录，执行命令：
+
+```
+[tmcore_1.0.17.12511]# ./install                                         
 ```
 
 输入：1，选择bcb；
@@ -146,13 +142,30 @@ https://wallet.bcbchain.io/public/Xwallet/linux/bcb-Xwallet_1.0.7.5443-x64.tar.g
 
 输入命令：curl localhost:46657/abci_info，如果显示"last_block_height"字段，即表示安装成功。
 
-<div STYLE="page-break-after: always;"></div>
+### 4.3.3 数据同步
 
-# 4 通讯协议
+安装完成后，节点就会同步区块，由于区块数据较大，同步区块大概需要十天时间，我们也提供离线数据包，您可以下载导入，这样可以加快同步速度。下载链接为：**http://211.154.140.124:43356/down/** ，下载后，把数据包分别放到指定目录，执行以下命令，即可完成数据导入。
+
+```
+systemctl stop tmcore.service
+systemctl stop bcbchain.service
+
+cd /home/tmcore/ && rm data -rf 
+tar xf tmcore_data_20190625.tar.gz
+
+cd /home/bcbchain/ && rm  .appstate.db -rf
+tar xf bcbchain_appstate.db_20190625.tar.gz
+
+systemctl start tmcore.service
+systemctl start bcbchain.service
+
+```
 
 
 
-## 4.1 协议概览
+# 5 通讯协议
+
+## 5.1 协议概览
 
 bcbXwallet_rpc服务程序支持如下所示的RPC通讯协议：
 
@@ -169,13 +182,13 @@ bcbXwallet_rpc服务程序提供的RPC接口列表如下所示（支持HTTPS，�
 
 <div STYLE="page-break-after: always;"></div>
 
-## 4.2 URI over HTTP
+## 5.2 URI over HTTP
 
 采用HTTP协议GET方法进行RPC请求时，参数必须采用URI编码，所有RPC调用的URL格式参见上表，具体业务及参数描述参见本章后续小节。
 
 
 
-## 4.3 JSONRPC over HTTP
+## 5.3 JSONRPC over HTTP
 
 采用HTTP协议POST方法进行RPC请求时，使用JSONRPC应用协议，请求的HTTP数据体的格式如下所示：
 
@@ -227,15 +240,15 @@ Example：
 
 
 
-# 5 编程接口
+# 6 编程接口
 
 
 
-## 5.1 钱包管理接口
+## 6.1 钱包管理接口
 
 
 
-### 5.1.1 bcb_walletCreate
+### 6.1.1 bcb_walletCreate
 
 向 bcbXwallet_rpc 服务提交创建一个新钱包的请求。
 
@@ -292,7 +305,7 @@ Example：
 
 
 
-### 5.1.2 bcb_walletExport
+### 6.1.2 bcb_walletExport
 
 向 bcbXwallet_rpc 服务提交导出一个钱包的请求。
 
@@ -353,7 +366,7 @@ Example：
 
 
 
-### 5.1.3 bcb_walletImport
+### 6.1.3 bcb_walletImport
 
 向 bcbXwallet_rpc 服务提交导入一个新钱包的请求。
 
@@ -417,7 +430,7 @@ Example：
 
 
 
-### 5.1.4 bcb_walletList
+### 6.1.4 bcb_walletList
 
 向 bcbXwallet_rpc 服务提交列出所有钱包信息的请求。
 
@@ -482,7 +495,7 @@ Example：
 
 
 
-### 5.1.5 bcb_transfer
+### 6.1.5 bcb_transfer
 
 向 bcbXwallet_rpc 服务提交一次资产转账的请求。
 
@@ -558,7 +571,7 @@ Example：
 
 
 
-### 5.1.5 bcb_transferOffline
+### 6.1.5 bcb_transferOffline
 
 向 bcbXwallet_rpc 服务提交离线构建一笔资产转账交易的请求。
 
@@ -635,11 +648,11 @@ Example：
 
 
 
-## 5.2 区块链接口
+## 6.2 区块链接口
 
 
 
-### 5.2.1 bcb_blockHeight
+### 6.2.1 bcb_blockHeight
 
 向 bcbXwallet_rpc 服务查询区块最新高度。
 
@@ -689,7 +702,7 @@ Example：
 
 
 
-### 5.2.2 bcb_block
+### 6.2.2 bcb_block
 
 向 bcbXwallet_rpc 服务查询区块数据。
 
@@ -803,7 +816,7 @@ Example：
 
 
 
-### 5.2.3 bcb_transaction
+### 6.2.3 bcb_transaction
 
 向 bcbXwallet_rpc 服务查询交易数据。
 
@@ -892,7 +905,7 @@ Example：
 
 
 
-### 5.2.4 bcb_balance
+### 6.2.4 bcb_balance
 
 向 bcbXwallet_rpc 服务查询账户 BCB 币的余额。
 
@@ -945,7 +958,7 @@ Example：
 
 
 
-### 5.2.5 bcb_balanceOfToken
+### 6.2.5 bcb_balanceOfToken
 
 向 bcbXwallet_rpc 服务查询账户指定代币余额。
 
@@ -1002,7 +1015,7 @@ Example：
 
 
 
-### 5.2.6 bcb_allBalance
+### 6.2.6 bcb_allBalance
 
 向 bcbXwallet_rpc 服务查询指定账户所有代币余额。
 
@@ -1066,7 +1079,7 @@ Example：
 
 
 
-### 5.2.7 bcb_nonce
+### 6.2.7 bcb_nonce
 
 向 bcbXwallet_rpc 服务查询账户在区块链上可用的下一个交易计数值。
 
@@ -1119,7 +1132,7 @@ Example：
 
 
 
-### 5.2.8 bcb_commitTx
+### 6.2.8 bcb_commitTx
 
 向 bcbXwallet_rpc 服务提交一次调用区块链上智能合约的交易的请求。
 
@@ -1184,7 +1197,7 @@ Example：
 
 
 
-### 5.2.9 bcb_version
+### 6.2.9 bcb_version
 
 向 bcbXwallet_rpc 服务查询版本号功能。
 
@@ -1234,7 +1247,7 @@ Example：
 
 
 
-# 6 bcbXwallet
+# 7 bcbXwallet
 
 
 
@@ -1242,7 +1255,7 @@ bcbXwallet是一个独立的命令行程序，提供了对rpc接口的本地调�
 
 
 
-## 6.1 使用方法
+## 7.1 使用方法
 
 命令运行格式如下：
 
@@ -1275,11 +1288,11 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-## 6.2 命令详解
+## 7.2 命令详解
 
 
 
-### 6.2.1 walletCreate
+### 7.2.1 walletCreate
 
 - **command**
 
@@ -1325,7 +1338,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.2 walletExport
+### 7.2.2 walletExport
 
 - **command**
 
@@ -1361,7 +1374,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.3 walletImport
+### 7.2.3 walletImport
 
 - **command**
 
@@ -1399,7 +1412,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.4 walletList
+### 7.2.4 walletList
 
 - **command**
 
@@ -1442,7 +1455,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.5 transfer
+### 7.2.5 transfer
 
 - **command**
 
@@ -1486,7 +1499,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.6 transferOffline
+### 7.2.6 transferOffline
 
 - **command**
 
@@ -1528,7 +1541,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.7 blockHeight
+### 7.2.7 blockHeight
 
 - **command**
 
@@ -1558,7 +1571,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.8 block
+### 7.2.8 block
 
 - **command**
 
@@ -1651,7 +1664,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.9 transaction
+### 7.2.9 transaction
 
 - **command**
 
@@ -1721,7 +1734,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.10 balance
+### 7.2.10 balance
 
 - **command**
 
@@ -1752,7 +1765,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.11 balanceOfToken
+### 7.2.11 balanceOfToken
 
 - **command**
 
@@ -1786,7 +1799,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.12 allBalance
+### 7.2.12 allBalance
 
 - **command**
 
@@ -1828,7 +1841,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.13 nonce
+### 7.2.13 nonce
 
 - **command**
 
@@ -1859,7 +1872,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.14 commitTx
+### 7.2.14 commitTx
 
 - **command**
 
@@ -1896,7 +1909,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 6.2.14 version
+### 7.2.15 version
 
 - **command**
 
@@ -1927,11 +1940,11 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-# 7 交易所快速集成方案
+# 8 交易所快速集成方案
 
 
 
-## 7.1 地址标签方案
+## 8.1 地址标签方案
 
 **带地址标签集成方案说明**：
 
@@ -1958,7 +1971,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-## 7.2 无地址标签方案
+## 8.2 无地址标签方案
 
 **无地址标签集成方案说明**：
 
@@ -1979,7 +1992,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-## 7.3 冷钱包向热钱包转账方案
+## 8.3 冷钱包向热钱包转账方案
 
 **冷钱包离线转账方案**
 
