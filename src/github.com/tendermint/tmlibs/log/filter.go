@@ -14,7 +14,7 @@ import (
 type level byte
 
 const (
-	levelTrace	level	= 1 << iota
+	levelTrace level = 1 << iota
 	levelDebug
 	levelInfo
 	levelWarn
@@ -23,33 +23,38 @@ const (
 )
 
 const (
-	DATEFORMAT		= "20060102150405"
-	DATETIMEFORMAT		= "[2006-01-02 15:04:05.000]"
-	TIMEZONEFORMAT		= "-07"
-	DEFAULT_FILE_COUNT	= 10
-	DEFAULT_FILE_SIZE	= 20 * 1024 * 1024
+	DATEFORMAT         = "20060102150405"
+	DATETIMEFORMAT     = "[2006-01-02 15:04:05.000]"
+	TIMEZONEFORMAT     = "-07"
+	DEFAULT_FILE_COUNT = 10
+	DEFAULT_FILE_SIZE  = 20 * 1024 * 1024 //20MB
 )
 
+// A filter struct to slice log file
 type filter struct {
-	next		Logger
-	logfile		string
-	loglevel	string
-	mtx		sync.Mutex
-	allowed		level
-	allowedKeyvals	map[keyval]level
+	next           Logger
+	logfile        string
+	loglevel       string
+	mtx            sync.Mutex
+	allowed        level            // XOR'd levels for default case
+	allowedKeyvals map[keyval]level // When key-value match, use this level
 }
 
 type keyval struct {
-	key	interface{}
-	value	interface{}
+	key   interface{}
+	value interface{}
 }
 
 var fl = (*filter)(nil)
 
+// NewFilter wraps next and implements filtering. See the commentary on the
+// Option functions for a detailed description of how to configure levels. If
+// no options are provided, all leveled log events created with Debug, Info or
+// Error helper methods are squelched.
 func NewFilter(next Logger, options ...Option) Logger {
 	l := &filter{
-		next:		next,
-		allowedKeyvals:	make(map[keyval]level),
+		next:           next,
+		allowedKeyvals: make(map[keyval]level),
 	}
 	for _, option := range options {
 		option(l)
@@ -57,15 +62,19 @@ func NewFilter(next Logger, options ...Option) Logger {
 	return l
 }
 
+// NewFileFilter wraps next and implements filtering. See the commentary on the
+// Option functions for a detailed description of how to configure levels. If
+// no options are provided, all leveled log events created with Debug, Info or
+// Error helper methods are squelched.
 func NewFileFilter(file string, lvl string, next Logger, options ...Option) Logger {
 	if len(file) == 0 {
 		return nil
 	}
 	fl = &filter{
-		next:		next,
-		logfile:	file,
-		loglevel:	lvl,
-		allowedKeyvals:	make(map[keyval]level),
+		next:           next,
+		logfile:        file,
+		loglevel:       lvl,
+		allowedKeyvals: make(map[keyval]level),
 	}
 	for _, option := range options {
 		option(fl)
@@ -74,6 +83,7 @@ func NewFileFilter(file string, lvl string, next Logger, options ...Option) Logg
 	return fl
 }
 
+// rotateRoutine function slices log file by size limitation in a routine
 func rotateRoutine(file string, level string) {
 	var src, dst *os.File
 	var f os.FileInfo
@@ -84,6 +94,9 @@ func rotateRoutine(file string, level string) {
 
 	for {
 		f, err = os.Stat(file)
+		if err != nil {
+			panic(err)
+		}
 		isRotate = false
 		if size = f.Size(); size > DEFAULT_FILE_SIZE {
 			isRotate = true
@@ -116,7 +129,7 @@ func checkAndRemoveFile(file string) {
 	bn := filepath.Base(file)
 	fl, _ := os.Stat(file)
 	tm := fl.ModTime()
-
+	//TO check and remove the oldest log file
 	dir, _ := filepath.Abs(filepath.Dir(file))
 	files, _ := ioutil.ReadDir(dir)
 	for _, f := range files {
@@ -218,6 +231,25 @@ func (l *filter) Fatal(msg string, keyvals ...interface{}) {
 	l.next.Fatal(msg, keyvals...)
 }
 
+func (l *filter) Flush() {
+
+}
+
+// With implements Logger by constructing a new filter with a keyvals appended
+// to the logger.
+//
+// If custom level was set for a keyval pair using one of the
+// Allow*With methods, it is used as the logger's level.
+//
+// Examples:
+//     logger = log.NewFilter(logger, log.AllowError(), log.AllowInfoWith("module", "crypto"))
+//		 logger.With("module", "crypto").Info("Hello") # produces "I... Hello module=crypto"
+//
+//     logger = log.NewFilter(logger, log.AllowError(), log.AllowInfoWith("module", "crypto"), log.AllowNoneWith("user", "Sam"))
+//		 logger.With("module", "crypto", "user", "Sam").Info("Hello") # returns nil
+//
+//     logger = log.NewFilter(logger, log.AllowError(), log.AllowInfoWith("module", "crypto"), log.AllowNoneWith("user", "Sam"))
+//		 logger.With("user", "Sam").With("module", "crypto").Info("Hello") # produces "I... Hello module=crypto user=Sam"
 func (l *filter) With(keyvals ...interface{}) Logger {
 	for i := len(keyvals) - 2; i >= 0; i -= 2 {
 		for kv, allowed := range l.allowedKeyvals {
@@ -229,8 +261,13 @@ func (l *filter) With(keyvals ...interface{}) Logger {
 	return &filter{next: l.next.With(keyvals...), allowed: l.allowed, allowedKeyvals: l.allowedKeyvals}
 }
 
+//--------------------------------------------------------------------------------
+
+// Option sets a parameter for the filter.
 type Option func(*filter)
 
+// AllowLevel returns an option for the given level or error if no option exist
+// for such level.
 func AllowLevel(lvl string) (Option, error) {
 	switch lvl {
 	case "trace":
@@ -252,34 +289,42 @@ func AllowLevel(lvl string) (Option, error) {
 	}
 }
 
+// AllowAll is an alias for AllowDebug.
 func AllowAll() Option {
 	return AllowTrace()
 }
 
+// AllowTrace allows fatal, error, info, debug and trace level log events to pass.
 func AllowTrace() Option {
 	return allowed(levelFatal | levelError | levelWarn | levelInfo | levelDebug | levelTrace)
 }
 
+// AllowDebug allows fatal, error, info and debug level log events to pass.
 func AllowDebug() Option {
 	return allowed(levelFatal | levelError | levelWarn | levelInfo | levelDebug)
 }
 
+// AllowInfo allows fatal, error and info level log events to pass.
 func AllowInfo() Option {
 	return allowed(levelFatal | levelError | levelWarn | levelInfo)
 }
 
+// AllowWarn allows fatal, error and warn level log events to pass.
 func AllowWarn() Option {
 	return allowed(levelFatal | levelError | levelWarn)
 }
 
+// AllowError allows fatal and error level log events to pass.
 func AllowError() Option {
 	return allowed(levelFatal | levelError)
 }
 
+// AllowFatal allows only fatal level log events to pass.
 func AllowFatal() Option {
 	return allowed(levelFatal)
 }
 
+// AllowNone allows no leveled log events to pass.
 func AllowNone() Option {
 	return allowed(0)
 }
@@ -288,22 +333,35 @@ func allowed(allowed level) Option {
 	return func(l *filter) { l.allowed = allowed }
 }
 
+// AllowDebugWith allows error, info and debug level log events to pass for a specific key value pair.
 func AllowDebugWith(key interface{}, value interface{}) Option {
-	return func(l *filter) { l.allowedKeyvals[keyval{key, value}] = levelError | levelInfo | levelDebug }
+	return func(l *filter) {
+		l.allowedKeyvals[keyval{key, value}] = levelError | levelWarn | levelInfo | levelDebug
+	}
 }
 
+// AllowInfoWith allows error, warn and info level log events to pass for a specific key value pair.
 func AllowInfoWith(key interface{}, value interface{}) Option {
-	return func(l *filter) { l.allowedKeyvals[keyval{key, value}] = levelError | levelWarn | levelInfo }
+	return func(l *filter) {
+		l.allowedKeyvals[keyval{key, value}] = levelError | levelWarn | levelInfo
+	}
 }
 
+// AllowWarnWith allows error and warn level log events to pass for a specific key value pair.
 func AllowWarnWith(key interface{}, value interface{}) Option {
-	return func(l *filter) { l.allowedKeyvals[keyval{key, value}] = levelError | levelWarn }
+	return func(l *filter) {
+		l.allowedKeyvals[keyval{key, value}] = levelError | levelWarn
+	}
 }
 
+// AllowErrorWith allows only error level log events to pass for a specific key value pair.
 func AllowErrorWith(key interface{}, value interface{}) Option {
-	return func(l *filter) { l.allowedKeyvals[keyval{key, value}] = levelError }
+	return func(l *filter) {
+		l.allowedKeyvals[keyval{key, value}] = levelError
+	}
 }
 
+// AllowNoneWith allows no leveled log events to pass for a specific key value pair.
 func AllowNoneWith(key interface{}, value interface{}) Option {
 	return func(l *filter) { l.allowedKeyvals[keyval{key, value}] = 0 }
 }

@@ -19,20 +19,21 @@ type Listener interface {
 	Stop() error
 }
 
+// Implements Listener
 type DefaultListener struct {
 	cmn.BaseService
 
-	listener	net.Listener
-	intAddr		*NetAddress
-	extAddr		*NetAddress
-	anoAddr		string
-	connections	chan net.Conn
+	listener    net.Listener
+	intAddr     *NetAddress
+	extAddr     *NetAddress
+	anoAddr     string
+	connections chan net.Conn
 }
 
 const (
-	numBufferedConnections	= 10
-	defaultExternalPort	= 8770
-	tryListenSeconds	= 5
+	numBufferedConnections = 10
+	defaultExternalPort    = 8770
+	tryListenSeconds       = 5
 )
 
 func splitHostPort(addr string) (host string, port int) {
@@ -47,10 +48,12 @@ func splitHostPort(addr string) (host string, port int) {
 	return host, port
 }
 
+// skipUPNP: If true, does not try getUPNPExternalAddress()
 func NewDefaultListener(protocol, lAddr, aAddr string, skipUPNP bool, logger log.Logger) Listener {
-
+	// Local listen IP & port
 	lAddrIP, lAddrPort := splitHostPort(lAddr)
 
+	// Create listener
 	var listener net.Listener
 	var err error
 	for i := 0; i < tryListenSeconds; i++ {
@@ -64,24 +67,26 @@ func NewDefaultListener(protocol, lAddr, aAddr string, skipUPNP bool, logger log
 	if err != nil {
 		panic(err)
 	}
-
+	// Actual listener local IP & port
 	listenerIP, listenerPort := splitHostPort(listener.Addr().String())
 	logger.Info("Local listener", "ip", listenerIP, "port", listenerPort)
 
+	// Determine internal address...
 	var intAddr *NetAddress
 	intAddr, err = NewNetAddressStringWithOptionalID(lAddr)
 	if err != nil {
 		panic(err)
 	}
 
+	// Determine external address...
 	var extAddr *NetAddress
 	if !skipUPNP {
-
+		// If the lAddrIP is INADDR_ANY, try UPnP
 		if lAddrIP == "" || lAddrIP == "0.0.0.0" {
 			extAddr = getUPNPExternalAddress(lAddrPort, listenerPort, logger)
 		}
 	}
-
+	// Otherwise just use the local address...
 	if extAddr == nil {
 		extAddr = getNaiveExternalAddress(listenerPort, false, logger)
 	}
@@ -90,14 +95,14 @@ func NewDefaultListener(protocol, lAddr, aAddr string, skipUPNP bool, logger log
 	}
 
 	dl := &DefaultListener{
-		listener:	listener,
-		intAddr:	intAddr,
-		extAddr:	extAddr,
-		anoAddr:	aAddr,
-		connections:	make(chan net.Conn, numBufferedConnections),
+		listener:    listener,
+		intAddr:     intAddr,
+		extAddr:     extAddr,
+		anoAddr:     aAddr,
+		connections: make(chan net.Conn, numBufferedConnections),
 	}
 	dl.BaseService = *cmn.NewBaseService(logger, "DefaultListener", dl)
-	err = dl.Start()
+	err = dl.Start() // Started upon construction
 	if err != nil {
 		logger.Error("Error starting base service", "err", err)
 	}
@@ -114,17 +119,20 @@ func (l *DefaultListener) OnStart() error {
 
 func (l *DefaultListener) OnStop() {
 	l.BaseService.OnStop()
-	l.listener.Close()
+	l.listener.Close() // nolint: errcheck
 }
 
+// Accept connections and pass on the channel
 func (l *DefaultListener) listenRoutine() {
 	for {
 		conn, err := l.listener.Accept()
 
 		if !l.IsRunning() {
-			break
+			break // Go to cleanup
 		}
 
+		// listener wasn't stopped,
+		// yet we encountered an error.
 		if err != nil {
 			panic(err)
 		}
@@ -132,12 +140,15 @@ func (l *DefaultListener) listenRoutine() {
 		l.connections <- conn
 	}
 
+	// Cleanup
 	close(l.connections)
 	for range l.connections {
-
+		// Drain
 	}
 }
 
+// A channel of inbound connections.
+// It gets closed when the listener closes.
 func (l *DefaultListener) Connections() <-chan net.Conn {
 	return l.connections
 }
@@ -150,6 +161,8 @@ func (l *DefaultListener) ExternalAddress() *NetAddress {
 	return l.extAddr
 }
 
+// NOTE: The returned listener is already Accept()'ing.
+// So it's not suitable to pass into http.Serve().
 func (l *DefaultListener) NetListener() net.Listener {
 	return l.listener
 }
@@ -162,6 +175,9 @@ func (l *DefaultListener) String() string {
 	}
 }
 
+/* external address helpers */
+
+// UPNP external address discovery & port mapping
 func getUPNPExternalAddress(externalPort, internalPort int, logger log.Logger) *NetAddress {
 	logger.Info("Getting UPNP external address")
 	nat, err := upnp.Discover()
@@ -176,6 +192,7 @@ func getUPNPExternalAddress(externalPort, internalPort int, logger log.Logger) *
 		return nil
 	}
 
+	// UPnP can't seem to get the external port, so let's just be explicit.
 	if externalPort == 0 {
 		externalPort = defaultExternalPort
 	}
@@ -190,6 +207,7 @@ func getUPNPExternalAddress(externalPort, internalPort int, logger log.Logger) *
 	return NewNetAddressIPPort(ext, uint16(externalPort))
 }
 
+// TODO: use syscalls: see issue #712
 func getNaiveExternalAddress(port int, settleForLocal bool, logger log.Logger) *NetAddress {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -204,10 +222,11 @@ func getNaiveExternalAddress(port int, settleForLocal bool, logger log.Logger) *
 		v4 := ipnet.IP.To4()
 		if v4 == nil || (!settleForLocal && v4[0] == 127) {
 			continue
-		}
+		} // loopback
 		return NewNetAddressIPPort(ipnet.IP, uint16(port))
 	}
 
+	// try again, but settle for local
 	logger.Info("Node may not be connected to internet. Settling for local address")
 	return getNaiveExternalAddress(port, true, logger)
 }

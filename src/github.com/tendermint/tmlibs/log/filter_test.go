@@ -10,9 +10,9 @@ import (
 
 func TestVariousLevels(t *testing.T) {
 	testCases := []struct {
-		name	string
-		allowed	log.Option
-		want	string
+		name    string
+		allowed log.Option
+		want    string
 	}{
 		{
 			"AllowAll",

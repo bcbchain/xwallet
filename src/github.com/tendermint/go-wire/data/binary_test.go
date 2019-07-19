@@ -34,8 +34,8 @@ func TestNestedBinary(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 
 	cases := []struct {
-		expected	string
-		foo		Fooer
+		expected string
+		foo      Fooer
 	}{
 		{"Bar Fly", Bar{Name: "Fly"}},
 		{"Foz Baz", Baz{Name: "For Bar"}},

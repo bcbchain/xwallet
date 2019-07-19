@@ -13,21 +13,21 @@ type atomicSetDeleter interface {
 }
 
 type memBatch struct {
-	db	atomicSetDeleter
-	ops	[]operation
+	db  atomicSetDeleter
+	ops []operation
 }
 
 type opType int
 
 const (
-	opTypeSet	opType	= 1
-	opTypeDelete	opType	= 2
+	opTypeSet    opType = 1
+	opTypeDelete opType = 2
 )
 
 type operation struct {
 	opType
-	key	[]byte
-	value	[]byte
+	key   []byte
+	value []byte
 }
 
 func (mBatch *memBatch) Set(key, value []byte) {
@@ -60,7 +60,7 @@ func (mBatch *memBatch) write(doSync bool) {
 			case opTypeDelete:
 				mBatch.db.DeleteNoLockSync(op.key)
 			}
-			break
+			break // we're done.
 		}
 		switch op.opType {
 		case opTypeSet:

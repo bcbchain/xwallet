@@ -32,7 +32,7 @@ func TestSimpleMap(t *testing.T) {
 	}
 	{
 		db := NewSimpleMap()
-		db.Set("key2", strHasher("value2"))
+		db.Set("key2", strHasher("value2")) // NOTE: out of order
 		db.Set("key1", strHasher("value1"))
 		assert.Equal(t, "1708aabc85bbe00242d3db8c299516aa54e48c38", fmt.Sprintf("%x", db.Hash()), "Hash didn't match")
 	}
@@ -45,7 +45,7 @@ func TestSimpleMap(t *testing.T) {
 	}
 	{
 		db := NewSimpleMap()
-		db.Set("key2", strHasher("value2"))
+		db.Set("key2", strHasher("value2")) // NOTE: out of order
 		db.Set("key1", strHasher("value1"))
 		db.Set("key3", strHasher("value3"))
 		assert.Equal(t, "e728afe72ce351eed6aca65c5f78da19b9a6e214", fmt.Sprintf("%x", db.Hash()), "Hash didn't match")

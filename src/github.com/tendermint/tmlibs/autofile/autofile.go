@@ -8,21 +8,45 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+/* AutoFile usage
+
+// Create/Append to ./autofile_test
+af, err := OpenAutoFile("autofile_test")
+if err != nil {
+	panic(err)
+}
+
+// Stream of writes.
+// During this time, the file may be moved e.g. by logRotate.
+for i := 0; i < 60; i++ {
+	af.Write([]byte(Fmt("LOOP(%v)", i)))
+	time.Sleep(time.Second)
+}
+
+// Close the AutoFile
+err = af.Close()
+if err != nil {
+	panic(err)
+}
+*/
+
 const autoFileOpenDuration = 1000 * time.Millisecond
 
+// Automatically closes and re-opens file for writing.
+// This is useful for using a log file with the logrotate tool.
 type AutoFile struct {
-	ID	string
-	Path	string
-	ticker	*time.Ticker
-	mtx	sync.Mutex
-	file	*os.File
+	ID     string
+	Path   string
+	ticker *time.Ticker
+	mtx    sync.Mutex
+	file   *os.File
 }
 
 func OpenAutoFile(path string) (af *AutoFile, err error) {
 	af = &AutoFile{
-		ID:	cmn.RandStr(12) + ":" + path,
-		Path:	path,
-		ticker:	time.NewTicker(autoFileOpenDuration),
+		ID:     cmn.RandStr(12) + ":" + path,
+		Path:   path,
+		ticker: time.NewTicker(autoFileOpenDuration),
 	}
 	if err = af.openFile(); err != nil {
 		return
@@ -43,7 +67,7 @@ func (af *AutoFile) processTicks() {
 	for {
 		_, ok := <-af.ticker.C
 		if !ok {
-			return
+			return // Done.
 		}
 		af.closeFile()
 	}

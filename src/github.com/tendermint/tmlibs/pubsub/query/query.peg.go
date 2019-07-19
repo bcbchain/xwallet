@@ -1,3 +1,4 @@
+// nolint
 package query
 
 import (
@@ -9,10 +10,11 @@ import (
 
 const endSymbol rune = 1114112
 
+/* The rule types inferred from the grammar are below. */
 type pegRule uint8
 
 const (
-	ruleUnknown	pegRule	= iota
+	ruleUnknown pegRule = iota
 	rulee
 	rulecondition
 	ruletag
@@ -59,7 +61,7 @@ var rul3s = [...]string{
 
 type token32 struct {
 	pegRule
-	begin, end	uint32
+	begin, end uint32
 }
 
 func (t *token32) String() string {
@@ -68,7 +70,7 @@ func (t *token32) String() string {
 
 type node32 struct {
 	token32
-	up, next	*node32
+	up, next *node32
 }
 
 func (node *node32) print(pretty bool, buffer string) {
@@ -118,8 +120,8 @@ func (t *tokens32) Print() {
 
 func (t *tokens32) AST() *node32 {
 	type element struct {
-		node	*node32
-		down	*element
+		node *node32
+		down *element
 	}
 	tokens := t.Tokens()
 	var stack *element
@@ -156,9 +158,9 @@ func (t *tokens32) Add(rule pegRule, begin, end, index uint32) {
 		t.tree = expanded
 	}
 	t.tree[index] = token32{
-		pegRule:	rule,
-		begin:		begin,
-		end:		end,
+		pegRule: rule,
+		begin:   begin,
+		end:     end,
 	}
 }
 
@@ -167,12 +169,12 @@ func (t *tokens32) Tokens() []token32 {
 }
 
 type QueryParser struct {
-	Buffer	string
-	buffer	[]rune
-	rules	[20]func() bool
-	parse	func(rule ...int) error
-	reset	func()
-	Pretty	bool
+	Buffer string
+	buffer []rune
+	rules  [20]func() bool
+	parse  func(rule ...int) error
+	reset  func()
+	Pretty bool
 	tokens32
 }
 
@@ -216,8 +218,8 @@ search:
 }
 
 type parseError struct {
-	p	*QueryParser
-	max	token32
+	p   *QueryParser
+	max token32
 }
 
 func (e *parseError) Error() string {
@@ -254,9 +256,9 @@ func (p *QueryParser) PrintSyntaxTree() {
 
 func (p *QueryParser) Init() {
 	var (
-		max			token32
-		position, tokenIndex	uint32
-		buffer			[]rune
+		max                  token32
+		position, tokenIndex uint32
+		buffer               []rune
 	)
 	p.reset = func() {
 		max = token32{}
@@ -302,9 +304,25 @@ func (p *QueryParser) Init() {
 		return false
 	}
 
+	/*matchChar := func(c byte) bool {
+		if buffer[position] == c {
+			position++
+			return true
+		}
+		return false
+	}*/
+
+	/*matchRange := func(lower byte, upper byte) bool {
+		if c := buffer[position]; c >= lower && c <= upper {
+			position++
+			return true
+		}
+		return false
+	}*/
+
 	_rules = [...]func() bool{
 		nil,
-
+		/* 0 e <- <('"' condition (' '+ and ' '+ condition)* '"' !.)> */
 		func() bool {
 			position0, tokenIndex0 := position, tokenIndex
 			{
@@ -425,7 +443,7 @@ func (p *QueryParser) Init() {
 			position, tokenIndex = position0, tokenIndex0
 			return false
 		},
-
+		/* 1 condition <- <(tag ' '* ((le ' '* ((&('D' | 'd') date) | (&('T' | 't') time) | (&('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9') number))) / (ge ' '* ((&('D' | 'd') date) | (&('T' | 't') time) | (&('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9') number))) / ((&('=') (equal ' '* ((&('\'') value) | (&('D' | 'd') date) | (&('T' | 't') time) | (&('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9') number)))) | (&('>') (g ' '* ((&('D' | 'd') date) | (&('T' | 't') time) | (&('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9') number)))) | (&('<') (l ' '* ((&('D' | 'd') date) | (&('T' | 't') time) | (&('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9') number)))) | (&('C' | 'c') (contains ' '* value)))))> */
 		func() bool {
 			position16, tokenIndex16 := position, tokenIndex
 			{
@@ -1004,9 +1022,9 @@ func (p *QueryParser) Init() {
 			position, tokenIndex = position16, tokenIndex16
 			return false
 		},
-
+		/* 2 tag <- <<(!((&('<') '<') | (&('>') '>') | (&('=') '=') | (&('\'') '\'') | (&('"') '"') | (&(')') ')') | (&('(') '(') | (&('\\') '\\') | (&('\r') '\r') | (&('\n') '\n') | (&('\t') '\t') | (&(' ') ' ')) .)+>> */
 		nil,
-
+		/* 3 value <- <<('\'' (!('"' / '\'') .)* '\'')>> */
 		func() bool {
 			position72, tokenIndex72 := position, tokenIndex
 			{
@@ -1061,7 +1079,7 @@ func (p *QueryParser) Init() {
 			position, tokenIndex = position72, tokenIndex72
 			return false
 		},
-
+		/* 4 number <- <<('0' / ([1-9] digit* ('.' digit*)?))>> */
 		func() bool {
 			position80, tokenIndex80 := position, tokenIndex
 			{
@@ -1123,7 +1141,7 @@ func (p *QueryParser) Init() {
 			position, tokenIndex = position80, tokenIndex80
 			return false
 		},
-
+		/* 5 digit <- <[0-9]> */
 		func() bool {
 			position91, tokenIndex91 := position, tokenIndex
 			{
@@ -1139,7 +1157,7 @@ func (p *QueryParser) Init() {
 			position, tokenIndex = position91, tokenIndex91
 			return false
 		},
-
+		/* 6 time <- <(('t' / 'T') ('i' / 'I') ('m' / 'M') ('e' / 'E') ' ' <(year '-' month '-' day 'T' digit digit ':' digit digit ':' digit digit ((('-' / '+') digit digit ':' digit digit) / 'Z'))>)> */
 		func() bool {
 			position93, tokenIndex93 := position, tokenIndex
 			{
@@ -1308,7 +1326,7 @@ func (p *QueryParser) Init() {
 			position, tokenIndex = position93, tokenIndex93
 			return false
 		},
-
+		/* 7 date <- <(('d' / 'D') ('a' / 'A') ('t' / 'T') ('e' / 'E') ' ' <(year '-' month '-' day)>)> */
 		func() bool {
 			position108, tokenIndex108 := position, tokenIndex
 			{
@@ -1405,7 +1423,7 @@ func (p *QueryParser) Init() {
 			position, tokenIndex = position108, tokenIndex108
 			return false
 		},
-
+		/* 8 year <- <(('1' / '2') digit digit digit)> */
 		func() bool {
 			position119, tokenIndex119 := position, tokenIndex
 			{
@@ -1441,7 +1459,7 @@ func (p *QueryParser) Init() {
 			position, tokenIndex = position119, tokenIndex119
 			return false
 		},
-
+		/* 9 month <- <(('0' / '1') digit)> */
 		func() bool {
 			position123, tokenIndex123 := position, tokenIndex
 			{
@@ -1471,7 +1489,7 @@ func (p *QueryParser) Init() {
 			position, tokenIndex = position123, tokenIndex123
 			return false
 		},
-
+		/* 10 day <- <(((&('3') '3') | (&('2') '2') | (&('1') '1') | (&('0') '0')) digit)> */
 		func() bool {
 			position127, tokenIndex127 := position, tokenIndex
 			{
@@ -1515,19 +1533,19 @@ func (p *QueryParser) Init() {
 			position, tokenIndex = position127, tokenIndex127
 			return false
 		},
-
+		/* 11 and <- <(('a' / 'A') ('n' / 'N') ('d' / 'D'))> */
 		nil,
-
+		/* 12 equal <- <'='> */
 		nil,
-
+		/* 13 contains <- <(('c' / 'C') ('o' / 'O') ('n' / 'N') ('t' / 'T') ('a' / 'A') ('i' / 'I') ('n' / 'N') ('s' / 'S'))> */
 		nil,
-
+		/* 14 le <- <('<' '=')> */
 		nil,
-
+		/* 15 ge <- <('>' '=')> */
 		nil,
-
+		/* 16 l <- <'<'> */
 		nil,
-
+		/* 17 g <- <'>'> */
 		nil,
 		nil,
 	}

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bcbXwallet/common"
-	"bcbXwallet/rpc"
-	"bcbchain.io/rpc/lib/server"
+	"bcXwallet/common"
+	"bcXwallet/rpc"
+	rpcserver "common/rpc/lib/server"
 	"github.com/tendermint/go-amino"
 	cmn "github.com/tendermint/tmlibs/common"
 	"net/http"
@@ -42,7 +42,7 @@ func main() {
 			cmn.Exit(err.Error())
 		}
 	}
-
+	// Wait forever
 	cmn.TrapSignal(func(signal os.Signal) {
 	})
 

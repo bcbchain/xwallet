@@ -14,9 +14,9 @@ type Input struct {
 
 func TestJSONTimeParse(t *testing.T) {
 	cases := []struct {
-		input		string
-		expected	time.Time
-		encoded		string
+		input    string
+		expected time.Time
+		encoded  string
 	}{
 		{
 			"2017-03-31T16:45:15Z",

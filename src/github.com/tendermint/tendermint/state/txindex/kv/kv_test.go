@@ -62,32 +62,32 @@ func TestTxSearch(t *testing.T) {
 	require.NoError(t, err)
 
 	testCases := []struct {
-		q		string
-		resultsLength	int
+		q             string
+		resultsLength int
 	}{
-
+		// search by hash
 		{fmt.Sprintf("tx.hash = '%X'", hash), 1},
-
+		// search by exact match (one tag)
 		{"account.number = 1", 1},
-
+		// search by exact match (two tags)
 		{"account.number = 1 AND account.owner = 'Ivan'", 1},
-
+		// search by exact match (two tags)
 		{"account.number = 1 AND account.owner = 'Vlad'", 0},
-
+		// search by range
 		{"account.number >= 1 AND account.number <= 5", 1},
-
+		// search by range (lower bound)
 		{"account.number >= 1", 1},
-
+		// search by range (upper bound)
 		{"account.number <= 5", 1},
-
+		// search using not allowed tag
 		{"not_allowed = 'boom'", 0},
-
+		// search for not existing tx result
 		{"account.number >= 2 AND account.number <= 5", 0},
-
+		// search using not existing tag
 		{"account.date >= TIME 2013-05-03T14:45:00Z", 0},
-
+		// search using CONTAINS
 		{"account.owner CONTAINS 'an'", 1},
-
+		// search using CONTAINS
 		{"account.owner CONTAINS 'Vlad'", 0},
 	}
 
@@ -127,6 +127,7 @@ func TestTxSearchMultipleTxs(t *testing.T) {
 	allowedTags := []string{"account.number"}
 	indexer := NewTxIndex(db.NewMemDB(), IndexTags(allowedTags))
 
+	// indexed first, but bigger height (to test the order of transactions)
 	txResult := txResultWithTags([]cmn.KVPair{
 		{Key: []byte("account.number"), Value: []byte("1")},
 	})
@@ -135,6 +136,7 @@ func TestTxSearchMultipleTxs(t *testing.T) {
 	err := indexer.Index(txResult)
 	require.NoError(t, err)
 
+	// indexed second, but smaller height (to test the order of transactions)
 	txResult2 := txResultWithTags([]cmn.KVPair{
 		{Key: []byte("account.number"), Value: []byte("2")},
 	})
@@ -175,15 +177,15 @@ func TestIndexAllTags(t *testing.T) {
 func txResultWithTags(tags []cmn.KVPair) *types.TxResult {
 	tx := types.Tx("HELLO WORLD")
 	return &types.TxResult{
-		Height:	1,
-		Index:	0,
-		Tx:	tx,
+		Height: 1,
+		Index:  0,
+		Tx:     tx,
 		Result: abci.ResponseDeliverTx{
-			Data:	[]byte{0},
-			Code:	abci.CodeTypeOK,
-			Log:	"",
-			Tags:	tags,
-			Fee:	cmn.KI64Pair{Key: nil, Value: 0},
+			Data: []byte{0},
+			Code: abci.CodeTypeOK,
+			Log:  "",
+			Tags: tags,
+			Fee:  cmn.KI64Pair{Key: nil, Value: 0},
 		},
 	}
 }
@@ -191,15 +193,15 @@ func txResultWithTags(tags []cmn.KVPair) *types.TxResult {
 func benchmarkTxIndex(txsCount int, b *testing.B) {
 	tx := types.Tx("HELLO WORLD")
 	txResult := &types.TxResult{
-		Height:	1,
-		Index:	0,
-		Tx:	tx,
+		Height: 1,
+		Index:  0,
+		Tx:     tx,
 		Result: abci.ResponseDeliverTx{
-			Data:	[]byte{0},
-			Code:	abci.CodeTypeOK,
-			Log:	"",
-			Tags:	[]cmn.KVPair{},
-			Fee:	cmn.KI64Pair{Key: []uint8{}, Value: 0},
+			Data: []byte{0},
+			Code: abci.CodeTypeOK,
+			Log:  "",
+			Tags: []cmn.KVPair{},
+			Fee:  cmn.KI64Pair{Key: []uint8{}, Value: 0},
 		},
 	}
 
@@ -207,7 +209,7 @@ func benchmarkTxIndex(txsCount int, b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll(dir)
+	defer os.RemoveAll(dir) // nolint: errcheck
 
 	store := db.NewDB("tx_index", "leveldb", dir)
 	indexer := NewTxIndex(store)
@@ -230,8 +232,8 @@ func benchmarkTxIndex(txsCount int, b *testing.B) {
 	}
 }
 
-func BenchmarkTxIndex1(b *testing.B)		{ benchmarkTxIndex(1, b) }
-func BenchmarkTxIndex500(b *testing.B)		{ benchmarkTxIndex(500, b) }
-func BenchmarkTxIndex1000(b *testing.B)		{ benchmarkTxIndex(1000, b) }
-func BenchmarkTxIndex2000(b *testing.B)		{ benchmarkTxIndex(2000, b) }
-func BenchmarkTxIndex10000(b *testing.B)	{ benchmarkTxIndex(10000, b) }
+func BenchmarkTxIndex1(b *testing.B)     { benchmarkTxIndex(1, b) }
+func BenchmarkTxIndex500(b *testing.B)   { benchmarkTxIndex(500, b) }
+func BenchmarkTxIndex1000(b *testing.B)  { benchmarkTxIndex(1000, b) }
+func BenchmarkTxIndex2000(b *testing.B)  { benchmarkTxIndex(2000, b) }
+func BenchmarkTxIndex10000(b *testing.B) { benchmarkTxIndex(10000, b) }

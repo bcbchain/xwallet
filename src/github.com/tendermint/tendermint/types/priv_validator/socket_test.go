@@ -19,8 +19,8 @@ import (
 
 func TestSocketPVAddress(t *testing.T) {
 	var (
-		chainID	= cmn.RandStr(12)
-		sc, rs	= testSetupSocketPair(t, chainID)
+		chainID = cmn.RandStr(12)
+		sc, rs  = testSetupSocketPair(t, chainID)
 	)
 	defer sc.Stop()
 	defer rs.Stop()
@@ -32,14 +32,15 @@ func TestSocketPVAddress(t *testing.T) {
 
 	assert.Equal(t, serverAddr, clientAddr)
 
+	// TODO(xla): Remove when PrivValidator2 replaced PrivValidator.
 	assert.Equal(t, serverAddr, sc.GetAddress())
 
 }
 
 func TestSocketPVPubKey(t *testing.T) {
 	var (
-		chainID	= cmn.RandStr(12)
-		sc, rs	= testSetupSocketPair(t, chainID)
+		chainID = cmn.RandStr(12)
+		sc, rs  = testSetupSocketPair(t, chainID)
 	)
 	defer sc.Stop()
 	defer rs.Stop()
@@ -51,17 +52,18 @@ func TestSocketPVPubKey(t *testing.T) {
 
 	assert.Equal(t, privKey, clientKey)
 
+	// TODO(xla): Remove when PrivValidator2 replaced PrivValidator.
 	assert.Equal(t, privKey, sc.GetPubKey())
 }
 
 func TestSocketPVProposal(t *testing.T) {
 	var (
-		chainID	= cmn.RandStr(12)
-		sc, rs	= testSetupSocketPair(t, chainID)
+		chainID = cmn.RandStr(12)
+		sc, rs  = testSetupSocketPair(t, chainID)
 
-		ts		= time.Now()
-		privProposal	= &types.Proposal{Timestamp: ts}
-		clientProposal	= &types.Proposal{Timestamp: ts}
+		ts             = time.Now()
+		privProposal   = &types.Proposal{Timestamp: ts}
+		clientProposal = &types.Proposal{Timestamp: ts}
 	)
 	defer sc.Stop()
 	defer rs.Stop()
@@ -73,13 +75,13 @@ func TestSocketPVProposal(t *testing.T) {
 
 func TestSocketPVVote(t *testing.T) {
 	var (
-		chainID	= cmn.RandStr(12)
-		sc, rs	= testSetupSocketPair(t, chainID)
+		chainID = cmn.RandStr(12)
+		sc, rs  = testSetupSocketPair(t, chainID)
 
-		ts	= time.Now()
-		vType	= types.VoteTypePrecommit
-		want	= &types.Vote{Timestamp: ts, Type: vType}
-		have	= &types.Vote{Timestamp: ts, Type: vType}
+		ts    = time.Now()
+		vType = types.VoteTypePrecommit
+		want  = &types.Vote{Timestamp: ts, Type: vType}
+		have  = &types.Vote{Timestamp: ts, Type: vType}
 	)
 	defer sc.Stop()
 	defer rs.Stop()
@@ -91,11 +93,11 @@ func TestSocketPVVote(t *testing.T) {
 
 func TestSocketPVHeartbeat(t *testing.T) {
 	var (
-		chainID	= cmn.RandStr(12)
-		sc, rs	= testSetupSocketPair(t, chainID)
+		chainID = cmn.RandStr(12)
+		sc, rs  = testSetupSocketPair(t, chainID)
 
-		want	= &types.Heartbeat{}
-		have	= &types.Heartbeat{}
+		want = &types.Heartbeat{}
+		have = &types.Heartbeat{}
 	)
 	defer sc.Stop()
 	defer rs.Stop()
@@ -122,9 +124,9 @@ func TestSocketPVAcceptDeadline(t *testing.T) {
 
 func TestSocketPVDeadline(t *testing.T) {
 	var (
-		addr	= testFreeAddr(t)
-		listenc	= make(chan struct{})
-		sc	= NewSocketPV(
+		addr    = testFreeAddr(t)
+		listenc = make(chan struct{})
+		sc      = NewSocketPV(
 			log.TestingLogger(),
 			addr,
 			crypto.GenPrivKeyEd25519(),
@@ -159,6 +161,7 @@ func TestSocketPVDeadline(t *testing.T) {
 
 	<-listenc
 
+	// Sleep to guarantee deadline has been hit.
 	time.Sleep(20 * time.Microsecond)
 
 	_, err := sc.getPubKey()
@@ -180,8 +183,8 @@ func TestSocketPVWait(t *testing.T) {
 
 func TestRemoteSignerRetry(t *testing.T) {
 	var (
-		attemptc	= make(chan int)
-		retries		= 2
+		attemptc = make(chan int)
+		retries  = 2
 	)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -233,18 +236,18 @@ func testSetupSocketPair(
 	chainID string,
 ) (*SocketPV, *RemoteSigner) {
 	var (
-		addr	= testFreeAddr(t)
-		logger	= log.TestingLogger()
-		privVal	= types.NewMockPV()
-		readyc	= make(chan struct{})
-		rs	= NewRemoteSigner(
+		addr    = testFreeAddr(t)
+		logger  = log.TestingLogger()
+		privVal = types.NewMockPV()
+		readyc  = make(chan struct{})
+		rs      = NewRemoteSigner(
 			logger,
 			chainID,
 			addr,
 			privVal,
 			crypto.GenPrivKeyEd25519(),
 		)
-		sc	= NewSocketPV(
+		sc = NewSocketPV(
 			logger,
 			addr,
 			crypto.GenPrivKeyEd25519(),
@@ -269,6 +272,7 @@ func testSetupSocketPair(
 	return sc, rs
 }
 
+// testFreeAddr claims a free port so we don't block on listener being ready.
 func testFreeAddr(t *testing.T) string {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)

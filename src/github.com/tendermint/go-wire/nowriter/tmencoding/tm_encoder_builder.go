@@ -2,6 +2,8 @@ package tmencoding
 
 import "time"
 
+// Allow chaining builder pattern syntactic sugar variation of Facade
+// teb.EncodeInt8(42).EncodeInt32(my_integer).Bytes()
 type TMEncoderBuilder interface {
 	Bytes() []byte
 	EncodeBool(b bool) TMEncoderBuilder
@@ -22,6 +24,7 @@ type TMEncoderBuilder interface {
 	EncodeVarint(i int) TMEncoderBuilder
 }
 
+// Ensure chaining syntax functions properly with compile-time assertion.
 func sugar_assertion_do_not_call(t TMEncoderBuilder) int {
 	var confirm_syntax []byte
 	confirm_syntax = t.EncodeBool(false).EncodeUint64(17).Bytes()

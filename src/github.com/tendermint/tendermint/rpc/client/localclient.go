@@ -12,10 +12,30 @@ import (
 	tmpubsub "github.com/tendermint/tmlibs/pubsub"
 )
 
+/*
+Local is a Client implementation that directly executes the rpc
+functions on a given node, without going through HTTP or GRPC.
+
+This implementation is useful for:
+
+* Running tests against a node in-process without the overhead
+of going through an http server
+* Communication between an ABCI app and Tendermint core when they
+are compiled in process.
+
+For real clients, you probably want to use client.HTTP.  For more
+powerful control during testing, you probably want the "client/mock" package.
+*/
 type Local struct {
 	*types.EventBus
 }
 
+// NewLocal configures a client that calls the Node directly.
+//
+// Note that given how rpc/core works with package singletons, that
+// you can only have one node per process.  So make sure test cases
+// don't run in parallel, or try to simulate an entire network in
+// one process...
 func NewLocal(node *nm.Node) *Local {
 	node.ConfigureRPC()
 	return &Local{
@@ -24,9 +44,9 @@ func NewLocal(node *nm.Node) *Local {
 }
 
 var (
-	_	Client		= (*Local)(nil)
-	_	NetworkClient	= Local{}
-	_	EventsClient	= (*Local)(nil)
+	_ Client        = (*Local)(nil)
+	_ NetworkClient = Local{}
+	_ EventsClient  = (*Local)(nil)
 )
 
 func (Local) Status() (*ctypes.ResultStatus, error) {

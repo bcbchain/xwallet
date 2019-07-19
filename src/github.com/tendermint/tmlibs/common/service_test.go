@@ -30,7 +30,7 @@ func TestBaseServiceWait(t *testing.T) {
 
 	select {
 	case <-waitFinished:
-
+		// all good
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("expected Wait() to finish within 100 ms.")
 	}

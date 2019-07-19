@@ -17,7 +17,7 @@ func TestIsHex(t *testing.T) {
 	notHex := []string{
 		"", "   ", "a", "x", "0", "0x", "0X", "0x ", "0X ", "0X a",
 		"0xf ", "0x f", "0xp", "0x-",
-		"0xf", "0XBED", "0xF", "0xbed",
+		"0xf", "0XBED", "0xF", "0xbed", // Odd lengths
 	}
 	for _, v := range notHex {
 		assert.False(t, IsHex(v), "%q is not hex", v)
@@ -33,10 +33,10 @@ func TestIsHex(t *testing.T) {
 
 func TestSplitAndTrim(t *testing.T) {
 	testCases := []struct {
-		s		string
-		sep		string
-		cutset		string
-		expected	[]string
+		s        string
+		sep      string
+		cutset   string
+		expected []string
 	}{
 		{"a,b,c", ",", " ", []string{"a", "b", "c"}},
 		{" a , b , c ", ",", " ", []string{"a", "b", "c"}},

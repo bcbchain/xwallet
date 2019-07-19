@@ -22,15 +22,15 @@ func TestNewNetAddress(t *testing.T) {
 
 func TestNewNetAddressStringWithOptionalID(t *testing.T) {
 	testCases := []struct {
-		addr		string
-		expected	string
-		correct		bool
+		addr     string
+		expected string
+		correct  bool
 	}{
 		{"127.0.0.1:8080", "127.0.0.1:8080", true},
 		{"tcp://127.0.0.1:8080", "127.0.0.1:8080", true},
 		{"udp://127.0.0.1:8080", "127.0.0.1:8080", true},
 		{"udp//127.0.0.1:8080", "", false},
-
+		// {"127.0.0:8080", false},
 		{"notahost", "", false},
 		{"127.0.0.1:notapath", "", false},
 		{"notahost:8080", "", false},
@@ -69,9 +69,9 @@ func TestNewNetAddressStringWithOptionalID(t *testing.T) {
 
 func TestNewNetAddressString(t *testing.T) {
 	testCases := []struct {
-		addr		string
-		expected	string
-		correct		bool
+		addr     string
+		expected string
+		correct  bool
 	}{
 		{"127.0.0.1:8080", "127.0.0.1:8080", false},
 		{"deadbeefdeadbeefdeadbeefdeadbeefdeadbeef@127.0.0.1:8080", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef@127.0.0.1:8080", true},
@@ -104,12 +104,12 @@ func TestNewNetAddressIPPort(t *testing.T) {
 }
 
 func TestNetAddressProperties(t *testing.T) {
-
+	// TODO add more test cases
 	testCases := []struct {
-		addr		string
-		valid		bool
-		local		bool
-		routable	bool
+		addr     string
+		valid    bool
+		local    bool
+		routable bool
 	}{
 		{"127.0.0.1:8080", true, true, false},
 		{"ya.ru:80", true, false, true},
@@ -126,11 +126,11 @@ func TestNetAddressProperties(t *testing.T) {
 }
 
 func TestNetAddressReachabilityTo(t *testing.T) {
-
+	// TODO add more test cases
 	testCases := []struct {
-		addr		string
-		other		string
-		reachability	int
+		addr         string
+		other        string
+		reachability int
 	}{
 		{"127.0.0.1:8080", "127.0.0.1:8081", 0},
 		{"ya.ru:80", "127.0.0.1:8080", 1},

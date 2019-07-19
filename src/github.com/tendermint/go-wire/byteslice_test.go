@@ -12,6 +12,7 @@ func TestReadByteSliceEquality(t *testing.T) {
 	var buf = bytes.NewBuffer(nil)
 	var bufBytes []byte
 
+	// Write a byteslice
 	var testBytes = []byte("ThisIsSomeTestArray")
 	var n int
 	var err error
@@ -21,6 +22,7 @@ func TestReadByteSliceEquality(t *testing.T) {
 	}
 	bufBytes = buf.Bytes()
 
+	// Read the byteslice, should return the same byteslice
 	buf = bytes.NewBuffer(bufBytes)
 	var n2 int
 	res := ReadByteSlice(buf, 0, &n2, &err)
@@ -42,6 +44,7 @@ func TestReadByteSliceLimit(t *testing.T) {
 	var buf = bytes.NewBuffer(nil)
 	var bufBytes []byte
 
+	// Write a byteslice
 	var testBytes = []byte("ThisIsSomeTestArray")
 	var n int
 	var err error
@@ -51,6 +54,7 @@ func TestReadByteSliceLimit(t *testing.T) {
 	}
 	bufBytes = buf.Bytes()
 
+	// Read the byteslice, should work fine with no limit.
 	buf = bytes.NewBuffer(bufBytes)
 	var n2 int
 	ReadByteSlice(buf, 0, &n2, &err)
@@ -61,6 +65,7 @@ func TestReadByteSliceLimit(t *testing.T) {
 		t.Error("Read bytes did not match write bytes length")
 	}
 
+	// Limit to the byteslice length, should succeed.
 	buf = bytes.NewBuffer(bufBytes)
 	t.Logf("%X", bufBytes)
 	var n3 int
@@ -72,6 +77,7 @@ func TestReadByteSliceLimit(t *testing.T) {
 		t.Error("Read bytes did not match write bytes length")
 	}
 
+	// Limit to the byteslice length, should succeed.
 	buf = bytes.NewBuffer(bufBytes)
 	var n4 int
 	ReadByteSlice(buf, len(bufBytes)-1, &n4, &err)
@@ -122,6 +128,9 @@ func TestGetByteSlice(t *testing.T) {
 	}
 }
 
+// Issues:
+// + https://github.com/tendermint/go-wire/issues/25
+// + https://github.com/tendermint/go-wire/issues/37
 func TestFuzzBinaryLengthOverflowsCaught(t *testing.T) {
 	n, err := int(0), error(nil)
 	var x []byte

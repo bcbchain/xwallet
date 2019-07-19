@@ -19,6 +19,7 @@ func TestDBIteratorSingleKey(t *testing.T) {
 			checkValid(t, itr, false)
 			checkNextPanics(t, itr)
 
+			// Once invalid...
 			checkInvalid(t, itr)
 		})
 	}
@@ -31,7 +32,7 @@ func TestDBIteratorTwoKeys(t *testing.T) {
 			db.SetSync(bz("1"), bz("value_1"))
 			db.SetSync(bz("2"), bz("value_1"))
 
-			{
+			{ // Fail by calling Next too much
 				itr := db.Iterator(nil, nil)
 				checkValid(t, itr, true)
 
@@ -43,6 +44,7 @@ func TestDBIteratorTwoKeys(t *testing.T) {
 
 				checkNextPanics(t, itr)
 
+				// Once invalid...
 				checkInvalid(t, itr)
 			}
 		})

@@ -10,26 +10,41 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+// ID is a hex-encoded crypto.Address
 type ID string
 
+// IDByteLength is the length of a crypto.Address. Currently only 20.
+// TODO: support other length addresses ?
 const IDByteLength = 20
 
+//------------------------------------------------------------------------------
+// Persistent peer ID
+// TODO: encrypt on disk
+
+// NodeKey is the persistent peer key.
+// It contains the nodes private key for authentication.
 type NodeKey struct {
-	PrivKey crypto.PrivKey `json:"priv_key"`
+	PrivKey crypto.PrivKey `json:"priv_key"` // our priv key
 }
 
+// ID returns the peer's canonical ID - the hash of its public key.
 func (nodeKey *NodeKey) ID() ID {
 	return PubKeyToID(nodeKey.PubKey())
 }
 
+// PubKey returns the peer's PubKey
 func (nodeKey *NodeKey) PubKey() crypto.PubKey {
 	return nodeKey.PrivKey.PubKey()
 }
 
+// PubKeyToID returns the ID corresponding to the given PubKey.
+// It's the hex-encoding of the pubKey.Address().
 func PubKeyToID(pubKey crypto.PubKey) ID {
-	return ID(pubKey.Address())
+	return ID(pubKey.Address(crypto.GetChainId()))
 }
 
+// LoadOrGenNodeKey attempts to load the NodeKey from the given filePath.
+// If the file does not exist, it generates and saves a new NodeKey.
 func LoadOrGenNodeKey(filePath string) (*NodeKey, error) {
 	if cmn.FileExists(filePath) {
 		nodeKey, err := LoadNodeKey(filePath)
@@ -73,6 +88,11 @@ func genNodeKey(filePath string) (*NodeKey, error) {
 	return nodeKey, nil
 }
 
+//------------------------------------------------------------------------------
+
+// MakePoWTarget returns the big-endian encoding of 2^(targetBits - difficulty) - 1.
+// It can be used as a Proof of Work target.
+// NOTE: targetBits must be a multiple of 8 and difficulty must be less than targetBits.
 func MakePoWTarget(difficulty, targetBits uint) []byte {
 	if targetBits%8 != 0 {
 		panic(fmt.Sprintf("targetBits (%d) not a multiple of 8", targetBits))

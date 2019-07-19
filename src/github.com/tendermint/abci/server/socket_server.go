@@ -5,35 +5,40 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/tendermint/abci/types"
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+// var maxNumberConnections = 2
+
 type SocketServer struct {
 	cmn.BaseService
 
-	proto		string
-	addr		string
-	listener	net.Listener
+	proto    string
+	addr     string
+	listener net.Listener
 
-	connsMtx	sync.Mutex
-	conns		map[int]net.Conn
-	nextConnID	int
+	connsMtx   sync.Mutex
+	conns      map[int]net.Conn
+	nextConnID int
 
-	appMtx	sync.Mutex
-	app	types.Application
+	// appMtx sync.Mutex
+	app types.Application
 }
 
 func NewSocketServer(protoAddr string, app types.Application) cmn.Service {
 	proto, addr := cmn.ProtocolAndAddress(protoAddr)
 	s := &SocketServer{
-		proto:		proto,
-		addr:		addr,
-		listener:	nil,
-		app:		app,
-		conns:		make(map[int]net.Conn),
+		proto:    proto,
+		addr:     addr,
+		listener: nil,
+		app:      app,
+		conns:    make(map[int]net.Conn),
 	}
 	s.BaseService = *cmn.NewBaseService(nil, "ABCIServer", s)
 	return s
@@ -79,6 +84,7 @@ func (s *SocketServer) addConn(conn net.Conn) int {
 	return connID
 }
 
+// deletes conn even if close errs
 func (s *SocketServer) rmConn(connID int) error {
 	s.connsMtx.Lock()
 	defer s.connsMtx.Unlock()
@@ -93,54 +99,112 @@ func (s *SocketServer) rmConn(connID int) error {
 }
 
 func (s *SocketServer) acceptConnectionsRoutine() {
+	var remoteIp string
+	var connID int
+	dataChan := make(chan bool)
 	for {
-
+		// Accept a connection
 		s.Logger.Info("Waiting for new connection...")
 		conn, err := s.listener.Accept()
 		if err != nil {
 			if !s.IsRunning() {
-				return
+				return // Ignore error from listener closing.
 			}
 			s.Logger.Error("Failed to accept connection: " + err.Error())
 			continue
 		}
 
-		s.Logger.Info("Accepted a new connection")
+		addr := conn.RemoteAddr().String()
+		currentRemoteIp := strings.Split(addr, ":")[0]
 
-		connID := s.addConn(conn)
+		if remoteIp == "" {
+			//起go协程，设置select，select一个case接收channel数据，接收到数据后重置计时器，一个case接收超时，超时后重启bcchain
+			go s.checkReqTimeOutInfo(dataChan)
+			remoteIp = currentRemoteIp
+		} else {
+			if currentRemoteIp != remoteIp {
+				//拒绝连接
+				s.Logger.Error("Connection refused because client ip %v is invalid", currentRemoteIp)
+				conn.Close()
+				continue
+			}
+		}
 
-		closeConn := make(chan error, 2)
-		responses := make(chan *types.Response, 1000)
+		//此处限制，当链接数大于3时，阻止进行连接
+		connAmount := len(s.conns)
+		if connAmount == 3 {
+			s.Logger.Error("There are four connections from same IP.")
+			s.killBcchain()
+			return
+		}
 
-		go s.handleRequests(closeConn, conn, responses)
+		connID = s.addConn(conn)
+		s.Logger.Info("Accepted a new connection", "connID", connID)
 
+		closeConn := make(chan error, 5)              // Push to signal connection closed
+		responses := make(chan *types.Response, 1000) // A channel to buffer responses
+
+		// Read requests from conn and deal with them
+		go s.handleRequests(closeConn, conn, responses, dataChan)
+		// Pull responses from 'responses' and write them to conn.
 		go s.handleResponses(closeConn, conn, responses)
 
+		// Wait until signal to close connection
 		go s.waitForClose(closeConn, connID)
+	}
+}
+
+func (s *SocketServer) checkReqTimeOutInfo(dataChan chan bool) {
+	//var timer *time.Timer
+	timer := time.NewTimer(600 * time.Second)
+	for {
+		select {
+		case <-dataChan: //Timer Reset
+			timer.Reset(600 * time.Second)
+			s.Logger.Debug("Timer Reset")
+		case <-timer.C:
+			s.Logger.Warn("no request 600 Seconds, chain is committing suicide")
+			s.Logger.Flush()
+			s.killBcchain()
+		}
 	}
 }
 
 func (s *SocketServer) waitForClose(closeConn chan error, connID int) {
 	err := <-closeConn
 	if err == io.EOF {
-		s.Logger.Error("Connection was closed by client")
+		s.Logger.Error("Connection was closed by client", "connID", connID)
 	} else if err != nil {
 		s.Logger.Error("Connection error", "error", err)
 	} else {
-
+		// never happens
 		s.Logger.Error("Connection was closed.")
 	}
 
+	// Close the connection
 	if err := s.rmConn(connID); err != nil {
 		s.Logger.Error("Error in closing connection", "error", err)
 	}
+	//杀死bcchain进程
+	s.killBcchain()
 }
 
-func (s *SocketServer) handleRequests(closeConn chan error, conn net.Conn, responses chan<- *types.Response) {
-	var count int
+func (s *SocketServer) killBcchain() {
+	pid := os.Getpid()
+	pstat, err := os.FindProcess(pid)
+	if err != nil {
+		panic(err.Error())
+	}
+	err = pstat.Signal(os.Kill) //kill process
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
+// Read requests from conn and deal with them
+func (s *SocketServer) handleRequests(closeConn chan error, conn net.Conn, responses chan<- *types.Response, dataChan chan bool) {
 	var bufReader = bufio.NewReader(conn)
 	for {
-
 		var req = &types.Request{}
 		err := types.ReadMessage(bufReader, req)
 		if err != nil {
@@ -151,20 +215,22 @@ func (s *SocketServer) handleRequests(closeConn chan error, conn net.Conn, respo
 			}
 			return
 		}
-		s.appMtx.Lock()
-		count++
-		s.handleRequest(req, responses)
-		s.appMtx.Unlock()
+		dataChan <- true
+		s.handleRequest(conn, req, responses)
 	}
 }
 
-func (s *SocketServer) handleRequest(req *types.Request, responses chan<- *types.Response) {
+func (s *SocketServer) handleRequest(conn net.Conn, req *types.Request, responses chan<- *types.Response) {
+
 	switch r := req.Value.(type) {
 	case *types.Request_Echo:
 		responses <- types.ToResponseEcho(r.Echo.Message)
 	case *types.Request_Flush:
 		responses <- types.ToResponseFlush()
 	case *types.Request_Info:
+		addr := conn.RemoteAddr().String()
+		spl := strings.Split(addr, ":")
+		r.Info.Host = spl[0]
 		res := s.app.Info(*r.Info)
 		responses <- types.ToResponseInfo(res)
 	case *types.Request_SetOption:
@@ -196,8 +262,9 @@ func (s *SocketServer) handleRequest(req *types.Request, responses chan<- *types
 	}
 }
 
+// Pull responses from 'responses' and write them to conn.
 func (s *SocketServer) handleResponses(closeConn chan error, conn net.Conn, responses <-chan *types.Response) {
-	var count int
+	//var count int
 	var bufWriter = bufio.NewWriter(conn)
 	for {
 		var res = <-responses
@@ -213,6 +280,6 @@ func (s *SocketServer) handleResponses(closeConn chan error, conn net.Conn, resp
 				return
 			}
 		}
-		count++
+		//count++
 	}
 }

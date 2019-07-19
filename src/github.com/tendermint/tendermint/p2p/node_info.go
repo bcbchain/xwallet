@@ -8,27 +8,38 @@ import (
 )
 
 const (
-	maxNodeInfoSize	= 10240
-	maxNumChannels	= 16
+	maxNodeInfoSize = 10240 // 10Kb
+	maxNumChannels  = 16    // plenty of room for upgrades, for now
 )
 
+// Max size of the NodeInfo struct
 func MaxNodeInfoSize() int {
 	return maxNodeInfoSize
 }
 
+// NodeInfo is the basic node information exchanged
+// between two peers during the Tendermint P2P handshake.
 type NodeInfo struct {
-	ID		ID	`json:"id"`
-	ListenAddr	string	`json:"listen_addr"`
+	// Authenticate
+	ID         ID     `json:"id"`          // authenticated identifier
+	ListenAddr string `json:"listen_addr"` // accepting incoming
 
-	Network		string		`json:"network"`
-	Channels	cmn.HexBytes	`json:"channels"`
-	Version		string		`json:"version"`
-	BaseVersion	string		`json:"base_version"`
+	// Check compatibility.
+	// Channels are HexBytes so easier to read as JSON
+	Network     string       `json:"network"`      // network/chain ID
+	Channels    cmn.HexBytes `json:"channels"`     // channels this node knows about
+	Version     string       `json:"version"`      // bcb de version
+	BaseVersion string       `json:"base_version"` // major.minor.revision
 
-	Moniker	string		`json:"moniker"`
-	Other	[]string	`json:"other"`
+	// Sanitize
+	Moniker string   `json:"moniker"` // arbitrary moniker
+	Other   []string `json:"other"`   // other application specific data
 }
 
+// Validate checks the self-reported NodeInfo is safe.
+// It returns an error if there
+// are too many Channels or any duplicate Channels.
+// TODO: constraints for Moniker/Other? Or is that for the UI ?
 func (info NodeInfo) Validate() error {
 	if len(info.Channels) > maxNumChannels {
 		return fmt.Errorf("info.Channels is too long (%v). Max is %v", len(info.Channels), maxNumChannels)
@@ -45,41 +56,51 @@ func (info NodeInfo) Validate() error {
 	return nil
 }
 
+// CompatibleWith checks if two NodeInfo are compatible with eachother.
+// CONTRACT: two nodes are compatible if the major/minor versions match and network match
+// and they have at least one channel in common.
 func (info NodeInfo) CompatibleWith(other NodeInfo) error {
-	iMajor, iMinor, _, iErr := splitVersion(info.Version)
-	oMajor, oMinor, _, oErr := splitVersion(other.Version)
+	iMajor, iMinor, _, iErr := splitVersion(info.BaseVersion) // 取的tendermint的版本号
+	oMajor, oMinor, _, oErr := splitVersion(other.BaseVersion)
 
+	// if our own version number is not formatted right, we messed up
 	if iErr != nil {
 		return iErr
 	}
 
+	// version number must be formatted correctly ("x.x.x")
 	if oErr != nil {
 		return oErr
 	}
 
+	// major version must match
 	if iMajor != oMajor {
 		return fmt.Errorf("Peer is on a different major version. Got %v, expected %v", oMajor, iMajor)
 	}
 
+	// minor version must match
 	if iMinor != oMinor {
 		return fmt.Errorf("Peer is on a different minor version. Got %v, expected %v", oMinor, iMinor)
 	}
 
+	// nodes must be on the same network
 	if info.Network != other.Network {
 		return fmt.Errorf("Peer is on a different network. Got %v, expected %v", other.Network, info.Network)
 	}
 
+	// if we have no channels, we're just testing
 	if len(info.Channels) == 0 {
 		return nil
 	}
 
+	// for each of our channels, check if they have it
 	found := false
 OUTER_LOOP:
 	for _, ch1 := range info.Channels {
 		for _, ch2 := range other.Channels {
 			if ch1 == ch2 {
 				found = true
-				break OUTER_LOOP
+				break OUTER_LOOP // only need one
 			}
 		}
 	}
@@ -89,10 +110,14 @@ OUTER_LOOP:
 	return nil
 }
 
+// NetAddress returns a NetAddress derived from the NodeInfo -
+// it includes the authenticated peer ID and the self-reported
+// ListenAddr. Note that the ListenAddr is not authenticated and
+// may not match that address actually dialed if its an outbound peer.
 func (info NodeInfo) NetAddress() *NetAddress {
 	netAddr, err := NewNetAddressString(IDAddressString(info.ID, info.ListenAddr))
 	if err != nil {
-		panic(err)
+		panic(err) // everything should be well formed by now
 	}
 	return netAddr
 }
@@ -104,7 +129,7 @@ func (info NodeInfo) String() string {
 
 func splitVersion(version string) (string, string, string, error) {
 	spl := strings.Split(version, ".")
-	if len(spl) != 4 {
+	if len(spl) != 3 {
 		return "", "", "", fmt.Errorf("Invalid version format %v", version)
 	}
 	return spl[0], spl[1], spl[2], nil

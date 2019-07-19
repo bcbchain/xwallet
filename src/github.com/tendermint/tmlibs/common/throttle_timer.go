@@ -5,15 +5,21 @@ import (
 	"time"
 )
 
+/*
+ThrottleTimer fires an event at most "dur" after each .Set() call.
+If a short burst of .Set() calls happens, ThrottleTimer fires once.
+If a long continuous burst of .Set() calls happens, ThrottleTimer fires
+at most once every "dur".
+*/
 type ThrottleTimer struct {
-	Name	string
-	Ch	chan struct{}
-	quit	chan struct{}
-	dur	time.Duration
+	Name string
+	Ch   chan struct{}
+	quit chan struct{}
+	dur  time.Duration
 
-	mtx	sync.Mutex
-	timer	*time.Timer
-	isSet	bool
+	mtx   sync.Mutex
+	timer *time.Timer
+	isSet bool
 }
 
 func NewThrottleTimer(name string, dur time.Duration) *ThrottleTimer {
@@ -34,7 +40,7 @@ func (t *ThrottleTimer) fireRoutine() {
 	case t.Ch <- struct{}{}:
 		t.isSet = false
 	case <-t.quit:
-
+		// do nothing
 	default:
 		t.timer.Reset(t.dur)
 	}
@@ -56,6 +62,8 @@ func (t *ThrottleTimer) Unset() {
 	t.timer.Stop()
 }
 
+// For ease of .Stop()'ing services before .Start()'ing them,
+// we ignore .Stop()'s on nil ThrottleTimers
 func (t *ThrottleTimer) Stop() bool {
 	if t == nil {
 		return false

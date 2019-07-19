@@ -10,14 +10,16 @@ func TestConsensusParams(t *testing.T) {
 	assert := asrt.New(t)
 
 	params := &ConsensusParams{
-		BlockSize:	&BlockSize{MaxGas: 12345},
-		BlockGossip:	&BlockGossip{BlockPartSizeBytes: 54321},
+		BlockSize:   &BlockSize{MaxGas: 12345},
+		BlockGossip: &BlockGossip{BlockPartSizeBytes: 54321},
 	}
-	var noParams *ConsensusParams
+	var noParams *ConsensusParams // nil
 
+	// no error with nil fields
 	assert.Nil(noParams.GetBlockSize())
 	assert.EqualValues(noParams.GetBlockSize().GetMaxGas(), 0)
 
+	// get values with real fields
 	assert.NotNil(params.GetBlockSize())
 	assert.EqualValues(params.GetBlockSize().GetMaxTxs(), 0)
 	assert.EqualValues(params.GetBlockSize().GetMaxGas(), 12345)

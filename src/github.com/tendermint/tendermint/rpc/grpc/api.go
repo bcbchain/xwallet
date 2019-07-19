@@ -11,7 +11,7 @@ type broadcastAPI struct {
 }
 
 func (bapi *broadcastAPI) Ping(ctx context.Context, req *RequestPing) (*ResponsePing, error) {
-
+	// kvstore so we can check if the server is up
 	return &ResponsePing{}, nil
 }
 
@@ -23,14 +23,14 @@ func (bapi *broadcastAPI) BroadcastTx(ctx context.Context, req *RequestBroadcast
 	return &ResponseBroadcastTx{
 
 		CheckTx: &abci.ResponseCheckTx{
-			Code:	res.CheckTx.Code,
-			Data:	res.CheckTx.Data,
-			Log:	res.CheckTx.Log,
+			Code: res.CheckTx.Code,
+			Data: res.CheckTx.Data,
+			Log:  res.CheckTx.Log,
 		},
 		DeliverTx: &abci.ResponseDeliverTx{
-			Code:	res.DeliverTx.Code,
-			Data:	res.DeliverTx.Data,
-			Log:	res.DeliverTx.Log,
+			Code: res.DeliverTx.Code,
+			Data: res.DeliverTx.Data,
+			Log:  res.DeliverTx.Log,
 		},
 	}, nil
 }

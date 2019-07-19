@@ -18,14 +18,14 @@ func TestParseLogLevel(t *testing.T) {
 	jsonLogger := log.NewTMJSONLogger(&buf)
 
 	correctLogLevels := []struct {
-		lvl			string
-		expectedLogLines	[]string
+		lvl              string
+		expectedLogLines []string
 	}{
 		{"mempool:error", []string{
-			``,
+			``, // if no default is given, assume info
 			``,
 			`{"_msg":"Mesmero","level":"error","module":"mempool"}`,
-			`{"_msg":"Mind","level":"info","module":"state"}`,
+			`{"_msg":"Mind","level":"info","module":"state"}`, // if no default is given, assume info
 			``}},
 
 		{"mempool:error,*:debug", []string{

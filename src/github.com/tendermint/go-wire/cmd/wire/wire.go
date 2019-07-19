@@ -20,6 +20,7 @@ func main() {
 		return
 	}
 
+	// fmt.Println(input)
 	got, err := expr.ParseReader(input, strings.NewReader(input))
 	if err != nil {
 		cmn.Exit("Error parsing input: " + err.Error())

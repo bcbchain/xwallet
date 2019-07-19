@@ -10,19 +10,23 @@ import (
 	"github.com/tendermint/abci/types"
 )
 
+// NewABCIClient returns newly connected client
 type ClientCreator interface {
 	NewABCIClient() (abcicli.Client, error)
 }
 
+//----------------------------------------------------
+// local proxy uses a mutex on an in-proc app
+
 type localClientCreator struct {
-	mtx	*sync.Mutex
-	app	types.Application
+	mtx *sync.Mutex
+	app types.Application
 }
 
 func NewLocalClientCreator(app types.Application) ClientCreator {
 	return &localClientCreator{
-		mtx:	new(sync.Mutex),
-		app:	app,
+		mtx: new(sync.Mutex),
+		app: app,
 	}
 }
 
@@ -30,17 +34,20 @@ func (l *localClientCreator) NewABCIClient() (abcicli.Client, error) {
 	return abcicli.NewLocalClient(l.mtx, l.app), nil
 }
 
+//---------------------------------------------------------------
+// remote proxy opens new connections to an external app process
+
 type remoteClientCreator struct {
-	addr		string
-	transport	string
-	mustConnect	bool
+	addr        string
+	transport   string
+	mustConnect bool
 }
 
 func NewRemoteClientCreator(addr, transport string, mustConnect bool) ClientCreator {
 	return &remoteClientCreator{
-		addr:		addr,
-		transport:	transport,
-		mustConnect:	mustConnect,
+		addr:        addr,
+		transport:   transport,
+		mustConnect: mustConnect,
 	}
 }
 
@@ -51,6 +58,9 @@ func (r *remoteClientCreator) NewABCIClient() (abcicli.Client, error) {
 	}
 	return remoteApp, nil
 }
+
+//-----------------------------------------------------------------
+// default
 
 func DefaultClientCreator(addr, transport, dbDir string) ClientCreator {
 	switch addr {
@@ -65,7 +75,7 @@ func DefaultClientCreator(addr, transport, dbDir string) ClientCreator {
 	case "nilapp":
 		return NewLocalClientCreator(types.NewBaseApplication())
 	default:
-		mustConnect := false
+		mustConnect := false // loop retrying
 		return NewRemoteClientCreator(addr, transport, mustConnect)
 	}
 }

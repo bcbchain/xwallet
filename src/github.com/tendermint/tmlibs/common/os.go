@@ -15,6 +15,8 @@ import (
 
 var gopath string
 
+// GoPath returns GOPATH env variable value. If it is not set, this function
+// will try to call `go env GOPATH` subcommand.
 func GoPath() string {
 	if gopath != "" {
 		return gopath
@@ -33,6 +35,8 @@ func GoPath() string {
 	return path
 }
 
+// TrapSignal catches the SIGTERM and executes cb function. After that it exits
+// with code 1.
 func TrapSignal(cb func(sig os.Signal)) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGHUP, syscall.SIGTERM)
@@ -48,6 +52,7 @@ func TrapSignal(cb func(sig os.Signal)) {
 	select {}
 }
 
+// Kill the running process by sending itself SIGTERM.
 func Kill() error {
 	p, err := os.FindProcess(os.Getpid())
 	if err != nil {
@@ -77,16 +82,17 @@ func IsDirEmpty(name string) (bool, error) {
 		if os.IsNotExist(err) {
 			return true, err
 		}
-
+		// Otherwise perhaps a permission
+		// error or some other error.
 		return false, err
 	}
 	defer f.Close()
 
-	_, err = f.Readdirnames(1)
+	_, err = f.Readdirnames(1) // Or f.Readdir(1)
 	if err == io.EOF {
 		return true, nil
 	}
-	return false, err
+	return false, err // Either not empty or error, suits both cases
 }
 
 func FileExists(filePath string) bool {
@@ -118,19 +124,22 @@ func MustWriteFile(filePath string, contents []byte, mode os.FileMode) {
 	}
 }
 
+// WriteFileAtomic creates a temporary file with data and the perm given and
+// swaps it atomically with filename if successful.
 func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 	var (
-		dir		= filepath.Dir(filename)
-		tempFile	= filepath.Join(dir, "write-file-atomic-"+RandStr(32))
-
-		flag	= os.O_WRONLY | os.O_CREATE | os.O_SYNC | os.O_TRUNC
+		dir      = filepath.Dir(filename)
+		tempFile = filepath.Join(dir, "write-file-atomic-"+RandStr(32))
+		// Override in case it does exist, create in case it doesn't and force kernel
+		// flush, which still leaves the potential of lingering disk cache.
+		flag = os.O_WRONLY | os.O_CREATE | os.O_SYNC | os.O_TRUNC
 	)
 
 	f, err := os.OpenFile(tempFile, flag, perm)
 	if err != nil {
 		return err
 	}
-
+	// Clean up in any case. Defer stacking order is last-in-first-out.
 	defer os.Remove(f.Name())
 	defer f.Close()
 
@@ -139,11 +148,14 @@ func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
 	} else if n < len(data) {
 		return io.ErrShortWrite
 	}
-
+	// Close the file before renaming it, otherwise it will cause "The process
+	// cannot access the file because it is being used by another process." on windows.
 	f.Close()
 
 	return os.Rename(f.Name(), filename)
 }
+
+//--------------------------------------------------------------------------------
 
 func Tempfile(prefix string) (*os.File, string) {
 	file, err := ioutil.TempFile("", prefix)
@@ -165,6 +177,8 @@ func Tempdir(prefix string) (*os.File, string) {
 	}
 	return dir, tempDir
 }
+
+//--------------------------------------------------------------------------------
 
 func Prompt(prompt string, defaultValue string) (string, error) {
 	fmt.Print(prompt)

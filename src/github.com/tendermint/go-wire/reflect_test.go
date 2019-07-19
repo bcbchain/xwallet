@@ -14,23 +14,27 @@ import (
 )
 
 type SimpleStruct struct {
-	String	string
-	Bytes	[]byte
-	Time	time.Time
+	String string
+	Bytes  []byte
+	Time   time.Time
 }
 
 type Animal interface{}
 
+// Implements Animal
 type Cat struct {
 	SimpleStruct
 }
 
+// Implements Animal
 type Dog struct {
 	SimpleStruct
 }
 
+// Implements Animal
 type Snake []byte
 
+// Implements Animal
 type Viper struct {
 	Bytes []byte
 }
@@ -45,6 +49,7 @@ var _ = RegisterInterface(
 
 func TestTime(t *testing.T) {
 
+	// panic trying to encode times before 1970
 	panicCases := []time.Time{
 		time.Time{},
 		time.Unix(-10, 0),
@@ -56,6 +61,7 @@ func TestTime(t *testing.T) {
 		assert.Panics(t, func() { WriteBinary(c, buf, n, err) }, "expected WriteBinary to panic on times before 1970")
 	}
 
+	// ensure we can encode/decode a recent time
 	now := time.Now()
 	n, err := new(int), new(error)
 	buf := new(bytes.Buffer)
@@ -67,9 +73,10 @@ func TestTime(t *testing.T) {
 		t.Fatalf("times dont match. got %v, expected %v", thisTime, now)
 	}
 
+	// error trying to decode bad times
 	errorCases := []struct {
-		thisTime	time.Time
-		err		error
+		thisTime time.Time
+		err      error
 	}{
 		{time.Time{}, ErrBinaryReadInvalidTimeNegative},
 		{time.Unix(-10, 0), ErrBinaryReadInvalidTimeNegative},
@@ -107,6 +114,8 @@ func TestEncodeDecode(t *testing.T) {
 		t.Fatalf("unexpected err: %v", *err)
 	}
 
+	// NOTE: this fails because []byte{} != []byte(nil)
+	// 	assert.Equal(t, cat, cat2, "expected cats to match")
 }
 
 func TestUnexportedEmbeddedTypes(t *testing.T) {
@@ -120,7 +129,7 @@ func TestUnexportedEmbeddedTypes(t *testing.T) {
 
 	now := time.Now().Truncate(time.Millisecond)
 	origCat := Cat{SimpleStruct{String: "cat", Time: now}}
-	exportedCat := exportedReceiver{origCat}
+	exportedCat := exportedReceiver{origCat} // this is what we encode
 	writeCat := func() *bytes.Buffer {
 		n, err := new(int), new(error)
 		buf := new(bytes.Buffer)
@@ -131,6 +140,7 @@ func TestUnexportedEmbeddedTypes(t *testing.T) {
 		return buf
 	}
 
+	// try to read into unexportedReceiver (should fail)
 	buf := writeCat()
 	n, err := new(int), new(error)
 	unexp := ReadBinary(unexportedReceiver{}, buf, 0, n, err).(unexportedReceiver)
@@ -142,6 +152,7 @@ func TestUnexportedEmbeddedTypes(t *testing.T) {
 		t.Fatalf("unexpectedly parsed out the Cat type")
 	}
 
+	// try to read into exportedReceiver (should pass)
 	buf = writeCat()
 	n, err = new(int), new(error)
 	exp := ReadBinary(exportedReceiver{}, buf, 0, n, err).(exportedReceiver)
@@ -154,26 +165,40 @@ func TestUnexportedEmbeddedTypes(t *testing.T) {
 	}
 
 	_ = returnCat
+	// NOTE: this fails because []byte{} != []byte(nil)
+	//	assert.Equal(t, origCat, returnCat, fmt.Sprintf("cats dont match"))
 
 }
 
+// TODO: add assertions here ...
 func TestAnimalInterface(t *testing.T) {
 	var foo Animal
 
+	// Type of pointer to Animal
 	rt := reflect.TypeOf(&foo)
 
+	// Type of Animal itself.
+	// NOTE: normally this is acquired through other means
+	// like introspecting on method signatures, or struct fields.
 	rte := rt.Elem()
 
+	// Get a new pointer to the interface
+	// NOTE: calling .Interface() is to get the actual value,
+	// instead of reflection values.
 	reflect.New(rte).Interface()
 
+	// Make a binary byteslice that represents a *snake.
 	foo = Snake([]byte("snake"))
 	snakeBytes := BinaryBytes(foo)
 	snakeReader := bytes.NewReader(snakeBytes)
 
+	// Now you can read it.
 	n, err := new(int), new(error)
 	animal := ReadBinary(foo, snakeReader, 0, n, err).(Animal)
 	assert.NotNil(t, animal)
 }
+
+//-------------------------------------
 
 type Constructor func() interface{}
 type Instantiator func() (o interface{}, ptr interface{})
@@ -185,12 +210,14 @@ type TestCase struct {
 	Validator
 }
 
+//-------------------------------------
+
 func constructBasic() interface{} {
 	cat := Cat{
 		SimpleStruct{
-			String:	"String",
-			Bytes:	[]byte("Bytes"),
-			Time:	time.Unix(123, 456789999),
+			String: "String",
+			Bytes:  []byte("Bytes"),
+			Time:   time.Unix(123, 456789999),
 		},
 	}
 	return cat
@@ -208,15 +235,17 @@ func validateBasic(o interface{}, t *testing.T) {
 	if string(cat.Bytes) != "Bytes" {
 		t.Errorf("Expected cat.Bytes == 'Bytes', got %X", cat.Bytes)
 	}
-	if cat.Time.UnixNano() != 123456000000 {
+	if cat.Time.UnixNano() != 123456000000 { // Only milliseconds
 		t.Errorf("Expected cat.Time.UnixNano() == 123456000000, got %v", cat.Time.UnixNano())
 	}
 }
 
+//-------------------------------------
+
 type NilTestStruct struct {
-	IntPtr	*int
-	CatPtr	*Cat
-	Animal	Animal
+	IntPtr *int
+	CatPtr *Cat
+	Animal Animal
 }
 
 func constructNilTestStruct() interface{} {
@@ -240,15 +269,17 @@ func validateNilTestStruct(o interface{}, t *testing.T) {
 	}
 }
 
+//-------------------------------------
+
 type ComplexStruct struct {
-	Name	string
-	Animal	Animal
+	Name   string
+	Animal Animal
 }
 
 func constructComplex() interface{} {
 	c := ComplexStruct{
-		Name:	"Complex",
-		Animal:	constructBasic(),
+		Name:   "Complex",
+		Animal: constructBasic(),
 	}
 	return c
 }
@@ -266,13 +297,15 @@ func validateComplex(o interface{}, t *testing.T) {
 	}
 }
 
+//-------------------------------------
+
 type ComplexStruct2 struct {
-	Cat	Cat
-	Dog	*Dog
-	Snake	Snake
-	Snake2	*Snake
-	Viper	Viper
-	Viper2	*Viper
+	Cat    Cat
+	Dog    *Dog
+	Snake  Snake
+	Snake2 *Snake
+	Viper  Viper
+	Viper2 *Viper
 }
 
 func constructComplex2() interface{} {
@@ -282,22 +315,22 @@ func constructComplex2() interface{} {
 	c := ComplexStruct2{
 		Cat: Cat{
 			SimpleStruct{
-				String:	"String",
-				Bytes:	[]byte("Bytes"),
-				Time:	time.Now(),
+				String: "String",
+				Bytes:  []byte("Bytes"),
+				Time:   time.Now(),
 			},
 		},
 		Dog: &Dog{
 			SimpleStruct{
-				String:	"Woof",
-				Bytes:	[]byte("Bark"),
-				Time:	time.Now(),
+				String: "Woof",
+				Bytes:  []byte("Bark"),
+				Time:   time.Now(),
 			},
 		},
-		Snake:	Snake([]byte("hiss")),
-		Snake2:	snakePtr_,
-		Viper:	Viper{Bytes: []byte("hizz")},
-		Viper2:	&Viper{Bytes: []byte("hizz")},
+		Snake:  Snake([]byte("hiss")),
+		Snake2: snakePtr_,
+		Viper:  Viper{Bytes: []byte("hizz")},
+		Viper2: &Viper{Bytes: []byte("hizz")},
 	}
 	return c
 }
@@ -345,11 +378,13 @@ func validateComplex2(o interface{}, t *testing.T) {
 	}
 }
 
+//-------------------------------------
+
 type ComplexStructArray struct {
-	Animals	[]Animal
-	Bytes	[5]byte
-	Ints	[5]int
-	Array	SimpleArray
+	Animals []Animal
+	Bytes   [5]byte
+	Ints    [5]int
+	Array   SimpleArray
 }
 
 func constructComplexArray() interface{} {
@@ -357,16 +392,16 @@ func constructComplexArray() interface{} {
 		Animals: []Animal{
 			Cat{
 				SimpleStruct{
-					String:	"String",
-					Bytes:	[]byte("Bytes"),
-					Time:	time.Now(),
+					String: "String",
+					Bytes:  []byte("Bytes"),
+					Time:   time.Now(),
 				},
 			},
 			Dog{
 				SimpleStruct{
-					String:	"Woof",
-					Bytes:	[]byte("Bark"),
-					Time:	time.Now(),
+					String: "Woof",
+					Bytes:  []byte("Bark"),
+					Time:   time.Now(),
 				},
 			},
 			Snake([]byte("hiss")),
@@ -374,9 +409,9 @@ func constructComplexArray() interface{} {
 				Bytes: []byte("hizz"),
 			},
 		},
-		Bytes:	[5]byte{1, 10, 50, 100, 200},
-		Ints:	[5]int{1, 2, 3, 4, 5},
-		Array:	SimpleArray([5]byte{1, 10, 50, 100, 200}),
+		Bytes: [5]byte{1, 10, 50, 100, 200},
+		Ints:  [5]int{1, 2, 3, 4, 5},
+		Array: SimpleArray([5]byte{1, 10, 50, 100, 200}),
 	}
 	return c
 }
@@ -426,6 +461,8 @@ func validateComplexArray(o interface{}, t *testing.T) {
 	}
 }
 
+//-----------------------------------------------------------------------------
+
 var testCases = []TestCase{}
 
 func init() {
@@ -442,21 +479,26 @@ func TestBinary(t *testing.T) {
 
 		t.Log(fmt.Sprintf("Running test case %v", i))
 
+		// Construct an object
 		o := testCase.Constructor()
 
+		// Write the object
 		data := BinaryBytes(o)
 		t.Logf("Binary: %X", data)
 
 		instance, instancePtr := testCase.Instantiator()
 
+		// Read onto a struct
 		n, err := new(int), new(error)
 		res := ReadBinary(instance, bytes.NewReader(data), 0, n, err)
 		if *err != nil {
 			t.Fatalf("Failed to read into instance: %v", *err)
 		}
 
+		// Validate object
 		testCase.Validator(res, t)
 
+		// Read onto a pointer
 		n, err = new(int), new(error)
 		res = ReadBinaryPtr(instancePtr, bytes.NewReader(data), 0, n, err)
 		if *err != nil {
@@ -466,8 +508,10 @@ func TestBinary(t *testing.T) {
 			t.Errorf("Expected pointer to pass through")
 		}
 
+		// Validate object
 		testCase.Validator(reflect.ValueOf(res).Elem().Interface(), t)
 
+		// Read with len(data)-1 limit should fail.
 		instance, _ = testCase.Instantiator()
 		n, err = new(int), new(error)
 		ReadBinary(instance, bytes.NewReader(data), len(data)-1, n, err)
@@ -475,6 +519,7 @@ func TestBinary(t *testing.T) {
 			t.Fatalf("Expected ErrBinaryReadOverflow")
 		}
 
+		// Read with len(data) limit should succeed.
 		instance, _ = testCase.Instantiator()
 		n, err = new(int), new(error)
 		ReadBinary(instance, bytes.NewReader(data), len(data), n, err)
@@ -492,21 +537,26 @@ func TestJSON(t *testing.T) {
 
 		t.Log(fmt.Sprintf("Running test case %v", i))
 
+		// Construct an object
 		o := testCase.Constructor()
 
+		// Write the object
 		data := JSONBytes(o)
 		t.Logf("JSON: %v", string(data))
 
 		instance, instancePtr := testCase.Instantiator()
 
+		// Read onto a struct
 		err := new(error)
 		res := ReadJSON(instance, data, err)
 		if *err != nil {
 			t.Fatalf("Failed to read cat: %v", *err)
 		}
 
+		// Validate object
 		testCase.Validator(res, t)
 
+		// Read onto a pointer
 		res = ReadJSON(instancePtr, data, err)
 		if *err != nil {
 			t.Fatalf("Failed to read cat: %v", *err)
@@ -516,31 +566,34 @@ func TestJSON(t *testing.T) {
 			t.Errorf("Expected pointer to pass through")
 		}
 
+		// Validate object
 		testCase.Validator(reflect.ValueOf(res).Elem().Interface(), t)
 	}
 
 }
 
+//------------------------------------------------------------------------------
+
 type Foo struct {
-	FieldA	string	`json:"fieldA"`
-	FieldB	string
-	fieldC	string
-	FieldD	string	`json:",omitempty"`
-	FieldE	string	`json:",omitempty"`
-	FieldF	string	`json:"F,omitempty"`
-	FieldG	string	`json:"G,omitempty"`
+	FieldA string `json:"fieldA"` // json field name is "fieldA"
+	FieldB string // json field name is "FieldB"
+	fieldC string // not exported, not serialized.
+	FieldD string `json:",omitempty"`  // omit if empty
+	FieldE string `json:",omitempty"`  // omit if empty (but won't be)
+	FieldF string `json:"F,omitempty"` // its name is "F", omit if empty
+	FieldG string `json:"G,omitempty"` // its name is "F", omit if empty (but won't be)
 }
 
 func TestJSONFieldNames(t *testing.T) {
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 20; i++ { // Try to ensure deterministic success.
 		foo := Foo{
-			FieldA:	"a",
-			FieldB:	"b",
-			fieldC:	"c",
-			FieldD:	"",
-			FieldE:	"e",
-			FieldF:	"",
-			FieldG:	"g",
+			FieldA: "a",
+			FieldB: "b",
+			fieldC: "c",
+			FieldD: "",  // omit because empty
+			FieldE: "e", // no omit, not empty
+			FieldF: "",  // omit because empty
+			FieldG: "g", // no omit, not empty
 		}
 		stringified := string(JSONBytes(foo))
 		expected := `{"fieldA":"a","FieldB":"b","FieldE":"e","G":"g"}`
@@ -551,32 +604,45 @@ func TestJSONFieldNames(t *testing.T) {
 	}
 }
 
+//------------------------------------------------------------------------------
+
 func TestBadAlloc(t *testing.T) {
 	n, err := new(int), new(error)
 	instance := new([]byte)
 	data := cmn.RandBytes(100 * 1024)
 	b := new(bytes.Buffer)
-
+	// this slice of data claims to be much bigger than it really is
 	WriteUvarint(uint(1<<32-1), b, n, err)
 	b.Write(data)
 	ReadBinary(instance, b, 0, n, err)
 }
+
+//------------------------------------------------------------------------------
 
 type SimpleArray [5]byte
 
 func TestSimpleArray(t *testing.T) {
 	var foo SimpleArray
 
+	// Type of pointer to array
 	rt := reflect.TypeOf(&foo)
 
+	// Type of array itself.
+	// NOTE: normally this is acquired through other means
+	// like introspecting on method signatures, or struct fields.
 	rte := rt.Elem()
 
+	// Get a new pointer to the array
+	// NOTE: calling .Interface() is to get the actual value,
+	// instead of reflection values.
 	reflect.New(rte).Interface()
 
+	// Make a simple int aray
 	fooArray := SimpleArray([5]byte{1, 10, 50, 100, 200})
 	fooBytes := BinaryBytes(fooArray)
 	fooReader := bytes.NewReader(fooBytes)
 
+	// Now you can read it.
 	n, err := new(int), new(error)
 	it := ReadBinary(foo, fooReader, 0, n, err).(SimpleArray)
 
@@ -584,6 +650,8 @@ func TestSimpleArray(t *testing.T) {
 		t.Errorf("Expected %v but got %v", fooArray, it)
 	}
 }
+
+//--------------------------------------------------------------------------------
 
 func TestNilPointerInterface(t *testing.T) {
 
@@ -617,6 +685,8 @@ func TestNilPointerInterface(t *testing.T) {
 
 }
 
+//--------------------------------------------------------------------------------
+
 func TestMultipleInterfaces(t *testing.T) {
 
 	type MyInterface1 interface{}
@@ -640,8 +710,8 @@ func TestMultipleInterfaces(t *testing.T) {
 	)
 
 	type MyStruct struct {
-		F1	[]MyInterface1
-		F2	[]MyInterface2
+		F1 []MyInterface1
+		F2 []MyInterface2
 	}
 
 	myStruct := MyStruct{
@@ -669,6 +739,8 @@ func TestMultipleInterfaces(t *testing.T) {
 		"0105"+"0001020304"+"0105"+"0011121314" {
 		t.Error("Unexpected binary bytes", hexStr)
 	}
+
+	// Now, read
 
 	myStruct2 := MyStruct{}
 	ReadBinaryPtr(&myStruct2, buf, 0, &n, &err)
@@ -724,6 +796,8 @@ func TestMultipleInterfaces(t *testing.T) {
 
 }
 
+//--------------------------------------------------------------------------------
+
 func TestPointers(t *testing.T) {
 
 	type Struct1 struct {
@@ -731,13 +805,13 @@ func TestPointers(t *testing.T) {
 	}
 
 	type MyStruct struct {
-		F1	*Struct1
-		F2	*Struct1
+		F1 *Struct1
+		F2 *Struct1
 	}
 
 	myStruct := MyStruct{
-		F1:	nil,
-		F2:	&Struct1{8},
+		F1: nil,
+		F2: &Struct1{8},
 	}
 	buf, n, err := new(bytes.Buffer), int(0), error(nil)
 	WriteBinary(myStruct, buf, &n, &err)
@@ -748,6 +822,8 @@ func TestPointers(t *testing.T) {
 		"00"+"010108" {
 		t.Error("Unexpected binary bytes", hexStr)
 	}
+
+	// Now, read
 
 	myStruct2 := MyStruct{}
 	ReadBinaryPtr(&myStruct2, buf, 0, &n, &err)
@@ -763,6 +839,8 @@ func TestPointers(t *testing.T) {
 	}
 
 }
+
+//--------------------------------------------------------------------------------
 
 func TestUnsafe(t *testing.T) {
 
@@ -801,6 +879,8 @@ func TestUnsafe(t *testing.T) {
 
 }
 
+//--------------------------------------------------------------------------------
+
 func TestUnwrap(t *testing.T) {
 
 	type Result interface{}
@@ -811,9 +891,9 @@ func TestUnwrap(t *testing.T) {
 	)
 
 	type Struct1 struct {
-		Result	Result	`json:"unwrap"`
-		other	string
-		Other	string	`json:"-"`
+		Result Result `json:"unwrap"`
+		other  string // this should be ignored, it is unexported
+		Other  string `json:"-"` // this should also be ignored
 	}
 
 	myStruct := Struct1{Result: &ConcreteResult{5}}

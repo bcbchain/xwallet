@@ -13,6 +13,12 @@ const (
 	defaultLogLevelKey = "*"
 )
 
+// ParseLogLevel parses complex log level - comma-separated
+// list of module:level pairs with an optional *:level pair (* means
+// all other modules).
+//
+// Example:
+//		ParseLogLevel("consensus:debug,mempool:debug,*:error", log.NewTMLogger(os.Stdout), "info")
 func ParseLogLevel(logfile, lvl string, logger log.Logger, defaultLogLevelValue string) (log.Logger, error) {
 	if lvl == "" {
 		return nil, errors.New("Empty log level")
@@ -20,6 +26,7 @@ func ParseLogLevel(logfile, lvl string, logger log.Logger, defaultLogLevelValue 
 
 	l := lvl
 
+	// prefix simple one word levels (e.g. "info") with "*"
 	if !strings.Contains(l, ":") {
 		l = defaultLogLevelKey + ":" + l
 	}
@@ -55,7 +62,7 @@ func ParseLogLevel(logfile, lvl string, logger log.Logger, defaultLogLevelValue 
 			case "info":
 				option = log.AllowInfoWith("module", module)
 			case "warn":
-				option = log.AllowErrorWith("module", module)
+				option = log.AllowWarnWith("module", module)
 			case "error":
 				option = log.AllowErrorWith("module", module)
 			case "none":
@@ -68,6 +75,7 @@ func ParseLogLevel(logfile, lvl string, logger log.Logger, defaultLogLevelValue 
 		}
 	}
 
+	// if "*" is not provided, set default global level
 	if !isDefaultLogLevelSet {
 		option, err = log.AllowLevel(defaultLogLevelValue)
 		if err != nil {

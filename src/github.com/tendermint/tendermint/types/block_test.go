@@ -22,31 +22,37 @@ func TestValidateBlock(t *testing.T) {
 	block := MakeBlock(h, txs, commit)
 	require.NotNil(t, block)
 
+	// proper block must pass
 	err = block.ValidateBasic()
 	require.NoError(t, err)
 
+	// tamper with NumTxs
 	block = MakeBlock(h, txs, commit)
 	block.NumTxs++
 	err = block.ValidateBasic()
 	require.Error(t, err)
 
+	// remove 1/2 the commits
 	block = MakeBlock(h, txs, commit)
 	block.LastCommit.Precommits = commit.Precommits[:commit.Size()/2]
-	block.LastCommit.hash = nil
+	block.LastCommit.hash = nil // clear hash or change wont be noticed
 	err = block.ValidateBasic()
 	require.Error(t, err)
 
+	// tamper with LastCommitHash
 	block = MakeBlock(h, txs, commit)
 	block.LastCommitHash = []byte("something else")
 	err = block.ValidateBasic()
 	require.Error(t, err)
 
+	// tamper with data
 	block = MakeBlock(h, txs, commit)
 	block.Data.Txs[0] = Tx("something else")
-	block.Data.hash = nil
+	block.Data.hash = nil // clear hash or change wont be noticed
 	err = block.ValidateBasic()
 	require.Error(t, err)
 
+	// tamper with DataHash
 	block = MakeBlock(h, txs, commit)
 	block.DataHash = cmn.RandBytes(len(block.DataHash))
 	err = block.ValidateBasic()
@@ -60,10 +66,10 @@ func makeBlockIDRandom() BlockID {
 
 func makeBlockID(hash string, partSetSize int, partSetHash string) BlockID {
 	return BlockID{
-		Hash:	[]byte(hash),
+		Hash: []byte(hash),
 		PartsHeader: PartSetHeader{
-			Total:	partSetSize,
-			Hash:	[]byte(partSetHash),
+			Total: partSetSize,
+			Hash:  []byte(partSetHash),
 		},
 	}
 

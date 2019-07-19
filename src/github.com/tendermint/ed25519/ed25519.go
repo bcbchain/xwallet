@@ -1,4 +1,13 @@
+// Copyright 2013 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Package ed25519 implements the Ed25519 signature algorithm. See
+// http://ed25519.cr.yp.to/.
 package ed25519
+
+// This code is a port of the public domain, "ref10" implementation of ed25519
+// from SUPERCOP.
 
 import (
 	"crypto/sha512"
@@ -9,11 +18,12 @@ import (
 )
 
 const (
-	PublicKeySize	= 32
-	PrivateKeySize	= 64
-	SignatureSize	= 64
+	PublicKeySize  = 32
+	PrivateKeySize = 64
+	SignatureSize  = 64
 )
 
+// GenerateKey generates a public/private key pair using randomness from rand.
 func GenerateKey(rand io.Reader) (publicKey *[PublicKeySize]byte, privateKey *[PrivateKeySize]byte, err error) {
 	privateKey = new([64]byte)
 	_, err = io.ReadFull(rand, privateKey[:32])
@@ -25,6 +35,7 @@ func GenerateKey(rand io.Reader) (publicKey *[PublicKeySize]byte, privateKey *[P
 	return
 }
 
+// MakePublicKey makes a publicKey from the first half of privateKey.
 func MakePublicKey(privateKey *[PrivateKeySize]byte) (publicKey *[PublicKeySize]byte) {
 	publicKey = new([32]byte)
 
@@ -46,6 +57,7 @@ func MakePublicKey(privateKey *[PrivateKeySize]byte) (publicKey *[PublicKeySize]
 	return
 }
 
+// Sign signs the message with privateKey and returns a signature.
 func Sign(privateKey *[PrivateKeySize]byte, message []byte) *[SignatureSize]byte {
 	h := sha512.New()
 	h.Write(privateKey[:32])
@@ -88,6 +100,7 @@ func Sign(privateKey *[PrivateKeySize]byte, message []byte) *[SignatureSize]byte
 	return signature
 }
 
+// Verify returns true iff sig is a valid signature of message by publicKey.
 func Verify(publicKey *[PublicKeySize]byte, message []byte, sig *[SignatureSize]byte) bool {
 	if sig[63]&224 != 0 {
 		return false

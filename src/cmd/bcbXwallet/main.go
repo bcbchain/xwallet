@@ -1,11 +1,11 @@
 package main
 
 import (
-	"bcbXwallet/client"
-	"bcbXwallet/common"
-	"bcbXwallet/rpc"
+	"bcXwallet/client"
+	"bcXwallet/common"
+	"bcXwallet/rpc"
+	rpcserver "common/rpc/lib/server"
 	"fmt"
-	"bcbchain.io/rpc/lib/server"
 	"github.com/spf13/cobra"
 	"github.com/tendermint/go-amino"
 	cmn "github.com/tendermint/tmlibs/common"
@@ -13,7 +13,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"unitest/bcbXwallettest/bcbxcmn"
 )
 
 const (
@@ -26,7 +25,7 @@ func main() {
 		panic(err)
 	}
 
-	if bcbxcmn.Version() == "" {
+	if version() == "" {
 		err = rpc.InitDB()
 		if err != nil {
 			panic(err)
@@ -60,7 +59,7 @@ func main() {
 	}
 }
 
-func serverAddr(address string, isHttps bool) string {
+func serverAddr(address string, bRequest bool) string {
 	splitAddr := strings.Split(address, ":")
 
 	if len(splitAddr) != 3 {
@@ -74,7 +73,7 @@ func serverAddr(address string, isHttps bool) string {
 		return ""
 	}
 
-	if isHttps {
+	if bRequest {
 		if common.GetConfig().UseHttps {
 			return fmt.Sprintf("https://127.0.0.1:%d", port)
 		} else {
@@ -85,37 +84,56 @@ func serverAddr(address string, isHttps bool) string {
 	}
 }
 
+func version() string {
+	params := map[string]interface{}{}
+	result := new(rpc.VersionResult)
+
+	err := common.DoHttpRequestAndParseEx([]string{serverAddr(common.GetConfig().ServerAddr, true)}, "bcb_version", params, result)
+	if err != nil {
+		return ""
+	}
+
+	return result.Version
+}
+
+// flags
 var (
-	flagRpcUrl	string
+	// global flags
+	flagRpcUrl string
 
-	flagHeight	int64
+	// block flag
+	flagHeight int64
 
-	flagTxHash	string
+	// transaction flag
+	flagTxHash string
 
-	flagAddress		string
-	flagTokenAddress	string
-	flagTokenName		string
+	// address flag
+	flagAddress      string
+	flagTokenAddress string
+	flagTokenName    string
 
-	flagTx	string
+	// commitTx flag
+	flagTx string
 
-	flagName		string
-	flagPassword		string
-	flagAccessKey		string
-	flagEncPrivateKey	string
-	flagSmcAddress		string
-	flagGasLimit		string
-	flagNote		string
-	flagNonce		string
-	flagTo			string
-	flagValue		string
-	flagPlainText		string
-	flagPageNum		uint64
+	// wallet flag
+	flagName          string
+	flagPassword      string
+	flagAccessKey     string
+	flagEncPrivateKey string
+	flagSmcAddress    string
+	flagGasLimit      string
+	flagNote          string
+	flagNonce         string
+	flagTo            string
+	flagValue         string
+	flagPlainText     string
+	flagPageNum       uint64
 )
 
 var RootCmd = &cobra.Command{
-	Use:	"bcbXwallet",
-	Short:	"bcbXwallet",
-	Long:	"bcb exchange wallet console",
+	Use:   "bcbXwallet",
+	Short: "bcb exchange wallet console",
+	Long:  "bcbXwallet client that it can perform the wallet operation, query chain information and so on.",
 }
 
 func Execute() error {
@@ -161,165 +179,165 @@ func addCommands() {
 }
 
 var walletCreateCmd = &cobra.Command{
-	Use:	"walletCreate",
-	Short:	"create wallet",
-	Long:	"create wallet",
-	Args:	cobra.ExactArgs(0),
+	Use:   "walletCreate",
+	Short: "Create wallet",
+	Long:  "Create a new wallet",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.WalletCreate(flagName, flagPassword, flagRpcUrl)
 	},
 }
 
 func addWalletCreateFlag() {
-	walletCreateCmd.PersistentFlags().StringVarP(&flagName, "name", "", "", "wallet name")
-	walletCreateCmd.PersistentFlags().StringVarP(&flagPassword, "password", "", "", "wallet password")
-	walletCreateCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	walletCreateCmd.PersistentFlags().StringVarP(&flagName, "name", "n", "", "wallet name")
+	walletCreateCmd.PersistentFlags().StringVarP(&flagPassword, "password", "p", "", "wallet password")
+	walletCreateCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var walletExportCmd = &cobra.Command{
-	Use:	"walletExport",
-	Short:	"export wallet",
-	Long:	"export wallet",
-	Args:	cobra.ExactArgs(0),
+	Use:   "walletExport",
+	Short: "Export wallet",
+	Long:  "Export the private key and walletAddr of wallet",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.WalletExport(flagName, flagPassword, flagAccessKey, flagRpcUrl, flagPlainText)
 	},
 }
 
 func addWalletExportFlag() {
-	walletExportCmd.PersistentFlags().StringVarP(&flagName, "name", "", "", "wallet name")
-	walletExportCmd.PersistentFlags().StringVarP(&flagPassword, "password", "", "", "wallet password")
-	walletExportCmd.PersistentFlags().StringVarP(&flagAccessKey, "accessKey", "", "", "wallet accessKey")
-	walletExportCmd.PersistentFlags().StringVarP(&flagPlainText, "plainText", "", "", "export plain text(default false)")
-	walletExportCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	walletExportCmd.PersistentFlags().StringVarP(&flagName, "name", "n", "", "wallet name")
+	walletExportCmd.PersistentFlags().StringVarP(&flagPassword, "password", "p", "", "wallet password")
+	walletExportCmd.PersistentFlags().StringVarP(&flagAccessKey, "accessKey", "a", "", "wallet accessKey")
+	walletExportCmd.PersistentFlags().StringVarP(&flagPlainText, "plainText", "t", "", "export plain text(default false)")
+	walletExportCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var walletImportCmd = &cobra.Command{
-	Use:	"walletImport",
-	Short:	"import wallet",
-	Long:	"import wallet",
-	Args:	cobra.ExactArgs(0),
+	Use:   "walletImport",
+	Short: "Import wallet",
+	Long:  "Import the private key to a new wallet",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.WalletImport(flagName, flagEncPrivateKey, flagPassword, flagAccessKey, flagRpcUrl, flagPlainText)
 	},
 }
 
 func addWalletImportFlag() {
-	walletImportCmd.PersistentFlags().StringVarP(&flagName, "name", "", "", "wallet name")
-	walletImportCmd.PersistentFlags().StringVarP(&flagEncPrivateKey, "privateKey", "", "", "wallet privateKey")
-	walletImportCmd.PersistentFlags().StringVarP(&flagPassword, "password", "", "", "wallet password")
-	walletImportCmd.PersistentFlags().StringVarP(&flagAccessKey, "accessKey", "", "", "wallet accessKey")
-	walletImportCmd.PersistentFlags().StringVarP(&flagPlainText, "plainText", "", "", "import plain text(default false)")
-	walletImportCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	walletImportCmd.PersistentFlags().StringVarP(&flagName, "name", "n", "", "wallet name")
+	walletImportCmd.PersistentFlags().StringVarP(&flagEncPrivateKey, "privateKey", "k", "", "wallet privateKey")
+	walletImportCmd.PersistentFlags().StringVarP(&flagPassword, "password", "p", "", "wallet password")
+	walletImportCmd.PersistentFlags().StringVarP(&flagAccessKey, "accessKey", "a", "", "wallet accessKey")
+	walletImportCmd.PersistentFlags().StringVarP(&flagPlainText, "plainText", "t", "", "import plain text(default false)")
+	walletImportCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var walletListCmd = &cobra.Command{
-	Use:	"walletList",
-	Short:	"list wallet",
-	Long:	"list wallet",
-	Args:	cobra.ExactArgs(0),
+	Use:   "walletList",
+	Short: "Wallet list",
+	Long:  "Query all wallet names and walletAddrs",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.WalletList(flagPageNum, flagRpcUrl)
 	},
 }
 
 func addWalletListFlag() {
-	walletListCmd.PersistentFlags().Uint64VarP(&flagPageNum, "pageNum", "", 1, "page index, default first page")
-	walletListCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	walletListCmd.PersistentFlags().Uint64VarP(&flagPageNum, "pageNum", "p", 1, "page index, default first page")
+	walletListCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var transferCmd = &cobra.Command{
-	Use:	"transfer",
-	Short:	"transfer token",
-	Long:	"transfer token",
-	Args:	cobra.ExactArgs(0),
+	Use:   "transfer",
+	Short: "Transfer token",
+	Long:  "Transfer token to someone with value",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.Transfer(flagName, flagAccessKey, flagSmcAddress, flagGasLimit, flagNote, flagTo, flagValue, flagRpcUrl)
 	},
 }
 
 func addTransferFlag() {
-	transferCmd.PersistentFlags().StringVarP(&flagName, "name", "", "", "wallet name")
-	transferCmd.PersistentFlags().StringVarP(&flagAccessKey, "accessKey", "", "", "wallet accessKey")
-	transferCmd.PersistentFlags().StringVarP(&flagSmcAddress, "smcAddress", "", "", "smart contract address")
-	transferCmd.PersistentFlags().StringVarP(&flagGasLimit, "gasLimit", "", "5000", "gas limit ")
-	transferCmd.PersistentFlags().StringVarP(&flagNote, "note", "", "", "note")
-	transferCmd.PersistentFlags().StringVarP(&flagTo, "to", "", "", "to address")
-	transferCmd.PersistentFlags().StringVarP(&flagValue, "value", "", "", "transfer value")
-	transferCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	transferCmd.PersistentFlags().StringVarP(&flagName, "name", "n", "", "wallet name")
+	transferCmd.PersistentFlags().StringVarP(&flagAccessKey, "accessKey", "a", "", "wallet accessKey")
+	transferCmd.PersistentFlags().StringVarP(&flagSmcAddress, "smcAddress", "s", "", "smart contract address")
+	transferCmd.PersistentFlags().StringVarP(&flagGasLimit, "gasLimit", "g", "5000", "gas limit ")
+	transferCmd.PersistentFlags().StringVarP(&flagNote, "note", "o", "", "note")
+	transferCmd.PersistentFlags().StringVarP(&flagTo, "to", "t", "", "to address")
+	transferCmd.PersistentFlags().StringVarP(&flagValue, "value", "v", "", "transfer value")
+	transferCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var transferOfflineCmd = &cobra.Command{
-	Use:	"transferOffline",
-	Short:	"offline pack and sign transfer transaction",
-	Long:	"offline pack and sign transfer transaction",
-	Args:	cobra.ExactArgs(0),
+	Use:   "transferOffline",
+	Short: "Offline transaction",
+	Long:  "Offline pack and sign transfer transaction",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.TransferOffline(flagName, flagAccessKey, flagSmcAddress, flagGasLimit, flagNote, flagTo, flagValue, flagNonce, flagRpcUrl)
 	},
 }
 
 func addTransferOfflineFlag() {
-	transferOfflineCmd.PersistentFlags().StringVarP(&flagName, "name", "", "", "wallet name")
-	transferOfflineCmd.PersistentFlags().StringVarP(&flagAccessKey, "accessKey", "", "", "wallet accessKey")
-	transferOfflineCmd.PersistentFlags().StringVarP(&flagSmcAddress, "smcAddress", "", "", "smart contract address")
-	transferOfflineCmd.PersistentFlags().StringVarP(&flagGasLimit, "gasLimit", "", "5000", "gas limit ")
-	transferOfflineCmd.PersistentFlags().StringVarP(&flagNonce, "nonce", "", "", "nonce")
-	transferOfflineCmd.PersistentFlags().StringVarP(&flagNote, "note", "", "", "note")
-	transferOfflineCmd.PersistentFlags().StringVarP(&flagTo, "to", "", "", "to address")
-	transferOfflineCmd.PersistentFlags().StringVarP(&flagValue, "value", "", "", "transfer value")
-	transferOfflineCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	transferOfflineCmd.PersistentFlags().StringVarP(&flagName, "name", "n", "", "wallet name")
+	transferOfflineCmd.PersistentFlags().StringVarP(&flagAccessKey, "accessKey", "a", "", "wallet accessKey")
+	transferOfflineCmd.PersistentFlags().StringVarP(&flagSmcAddress, "smcAddress", "s", "", "smart contract address")
+	transferOfflineCmd.PersistentFlags().StringVarP(&flagGasLimit, "gasLimit", "g", "5000", "gas limit ")
+	transferOfflineCmd.PersistentFlags().StringVarP(&flagNonce, "nonce", "c", "", "nonce")
+	transferOfflineCmd.PersistentFlags().StringVarP(&flagNote, "note", "o", "", "note")
+	transferOfflineCmd.PersistentFlags().StringVarP(&flagTo, "to", "t", "", "to address")
+	transferOfflineCmd.PersistentFlags().StringVarP(&flagValue, "value", "v", "", "transfer value")
+	transferOfflineCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var blockHeightCmd = &cobra.Command{
-	Use:	"blockHeight",
-	Short:	"get current block height",
-	Long:	"get current block height",
-	Args:	cobra.ExactArgs(0),
+	Use:   "blockHeight",
+	Short: "Get current block height",
+	Long:  "Get BlockChain current block height",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.BlockHeight(flagRpcUrl)
 	},
 }
 
 func addBlockHeightFlag() {
-	blockHeightCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	blockHeightCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var blockCmd = &cobra.Command{
-	Use:	"block",
-	Short:	"get block info with height",
-	Long:	"get block info with height",
-	Args:	cobra.ExactArgs(0),
+	Use:   "block",
+	Short: "Get block information",
+	Long:  "Get block information with height, must great than zero",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.Block(flagHeight, flagRpcUrl)
 	},
 }
 
 func addBlockFlag() {
-	blockCmd.PersistentFlags().Int64VarP(&flagHeight, "height", "", 0, "block height")
-	blockCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	blockCmd.PersistentFlags().Int64VarP(&flagHeight, "height", "t", 0, "block height")
+	blockCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var transactionCmd = &cobra.Command{
-	Use:	"transaction",
-	Short:	"get transaction info with txHash",
-	Long:	"get transaction info with txHash",
-	Args:	cobra.ExactArgs(0),
+	Use:   "transaction",
+	Short: "Get transaction information",
+	Long:  "Get transaction information with txHash and cannot be empty",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.Transaction(flagTxHash, flagRpcUrl)
 	},
 }
 
 func addTransactionFlag() {
-	transactionCmd.PersistentFlags().StringVarP(&flagTxHash, "txHash", "", "", "transaction's hash")
-	transactionCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	transactionCmd.PersistentFlags().StringVarP(&flagTxHash, "txHash", "t", "", "transaction's hash")
+	transactionCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var balanceCmd = &cobra.Command{
-	Use:	"balance",
-	Short:	"get balance of BCB token for specific address",
-	Long:	"get balance of BCB token for specific address",
-	Args:	cobra.ExactArgs(0),
+	Use:   "balance",
+	Short: "Get balance information",
+	Long:  "Get balance of BCB token for specific address",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.Balance(flagAddress, flagRpcUrl)
 	},
@@ -327,67 +345,67 @@ var balanceCmd = &cobra.Command{
 
 func addBalanceFlag() {
 	balanceCmd.PersistentFlags().StringVarP(&flagAddress, "address", "a", "", "account's address")
-	balanceCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	balanceCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var balanceOfTokenCmd = &cobra.Command{
-	Use:	"balanceOfToken",
-	Short:	"get balance of specific token for specific address",
-	Long:	"get balance of specific token for specific address",
-	Args:	cobra.ExactArgs(0),
+	Use:   "balanceOfToken",
+	Short: "Get balance information of address",
+	Long:  "Get balance of specific token for specific address",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.BalanceOfToken(flagAddress, flagTokenAddress, flagTokenName, flagRpcUrl)
 	},
 }
 
 func addBalanceOfTokenFlag() {
-	balanceOfTokenCmd.PersistentFlags().StringVarP(&flagAddress, "address", "", "", "account's address")
-	balanceOfTokenCmd.PersistentFlags().StringVarP(&flagTokenAddress, "tokenAddress", "", "", "token's address")
-	balanceOfTokenCmd.PersistentFlags().StringVarP(&flagTokenName, "tokenName", "", "", "token's address")
-	balanceOfTokenCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	balanceOfTokenCmd.PersistentFlags().StringVarP(&flagAddress, "address", "a", "", "account's address")
+	balanceOfTokenCmd.PersistentFlags().StringVarP(&flagTokenAddress, "tokenAddress", "t", "", "token's address")
+	balanceOfTokenCmd.PersistentFlags().StringVarP(&flagTokenName, "tokenName", "n", "", "token's address")
+	balanceOfTokenCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var allBalanceCmd = &cobra.Command{
-	Use:	"allBalance",
-	Short:	"get balance of all tokens for specific address",
-	Long:	"get balance of all tokens for specific address",
-	Args:	cobra.ExactArgs(0),
+	Use:   "allBalance",
+	Short: "Get all balance information",
+	Long:  "Get balance of all tokens for specific address",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.AllBalance(flagAddress, flagRpcUrl)
 	},
 }
 
 func addAllBalanceFlag() {
-	allBalanceCmd.PersistentFlags().StringVarP(&flagAddress, "address", "", "", "account's address")
-	allBalanceCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	allBalanceCmd.PersistentFlags().StringVarP(&flagAddress, "address", "a", "", "account's address")
+	allBalanceCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var nonceCmd = &cobra.Command{
-	Use:	"nonce",
-	Short:	"get the next usable nonce for specific address",
-	Long:	"get the next usable nonce for specific address",
-	Args:	cobra.ExactArgs(0),
+	Use:   "nonce",
+	Short: "Get account nonce",
+	Long:  "Get the next usable nonce for specific address",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.Nonce(flagAddress, flagRpcUrl)
 	},
 }
 
 func addNonceFlag() {
-	nonceCmd.PersistentFlags().StringVarP(&flagAddress, "address", "", "", "account's address")
-	nonceCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	nonceCmd.PersistentFlags().StringVarP(&flagAddress, "address", "a", "", "account's address")
+	nonceCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }
 
 var commitTxCmd = &cobra.Command{
-	Use:	"commitTx",
-	Short:	"commit transaction",
-	Long:	"commit transaction",
-	Args:	cobra.ExactArgs(0),
+	Use:   "commitTx",
+	Short: "Commit transaction",
+	Long:  "Commit transaction with tx's data",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return client.CommitTx(flagTx, flagRpcUrl)
 	},
 }
 
 func addCommitTxFlag() {
-	commitTxCmd.PersistentFlags().StringVarP(&flagTx, "tx", "", "", "packed and signed transaction's data")
-	commitTxCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "", serverAddr(common.GetConfig().ServerAddr, true), usage)
+	commitTxCmd.PersistentFlags().StringVarP(&flagTx, "tx", "t", "", "packed and signed transaction's data")
+	commitTxCmd.PersistentFlags().StringVarP(&flagRpcUrl, "url", "u", serverAddr(common.GetConfig().ServerAddr, true), usage)
 }

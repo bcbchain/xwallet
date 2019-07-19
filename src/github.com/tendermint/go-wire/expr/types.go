@@ -12,9 +12,11 @@ type Byteful interface {
 	Bytes() ([]byte, error)
 }
 
+//----------------------------------------
+
 type Numeric struct {
-	Type	string
-	Number	string
+	Type   string
+	Number string
 }
 
 func (n Numeric) Bytes() ([]byte, error) {
@@ -23,29 +25,31 @@ func (n Numeric) Bytes() ([]byte, error) {
 		return nil, err
 	}
 	switch n.Type {
-	case "u":
+	case "u": // Uvarint
 		return wire.BinaryBytes(uint(num)), nil
-	case "i":
+	case "i": // Varint
 		return wire.BinaryBytes(int(num)), nil
-	case "u64":
+	case "u64": // Uint64
 		return wire.BinaryBytes(uint64(num)), nil
-	case "i64":
+	case "i64": // Int64
 		return wire.BinaryBytes(int64(num)), nil
-	case "u32":
+	case "u32": // Uint32
 		return wire.BinaryBytes(uint32(num)), nil
-	case "i32":
+	case "i32": // Int32
 		return wire.BinaryBytes(int32(num)), nil
-	case "u16":
+	case "u16": // Uint16
 		return wire.BinaryBytes(uint16(num)), nil
-	case "i16":
+	case "i16": // Int16
 		return wire.BinaryBytes(int16(num)), nil
-	case "u8":
+	case "u8": // Uint8
 		return wire.BinaryBytes(uint8(num)), nil
-	case "i8":
+	case "i8": // Int8
 		return wire.BinaryBytes(int8(num)), nil
 	}
 	return nil, errors.New(cmn.Fmt("Unknown Numeric type %v", n.Type))
 }
+
+//----------------------------------------
 
 type Tuple []interface{}
 
@@ -77,6 +81,8 @@ func (t Tuple) String() string {
 	return s
 }
 
+//----------------------------------------
+
 type Array []interface{}
 
 func (arr Array) Bytes() ([]byte, error) {
@@ -107,15 +113,17 @@ func (t Array) String() string {
 	return s
 }
 
+//----------------------------------------
+
 type Bytes struct {
-	Data		[]byte
-	LengthPrefixed	bool
+	Data           []byte
+	LengthPrefixed bool
 }
 
 func NewBytes(bz []byte, lengthPrefixed bool) Bytes {
 	return Bytes{
-		Data:		bz,
-		LengthPrefixed:	lengthPrefixed,
+		Data:           bz,
+		LengthPrefixed: lengthPrefixed,
 	}
 }
 
@@ -137,6 +145,8 @@ func (b Bytes) String() string {
 	}
 }
 
+//----------------------------------------
+
 type Placeholder struct {
 	Label string
 }
@@ -148,6 +158,8 @@ func (p Placeholder) Bytes() ([]byte, error) {
 func (p Placeholder) String() string {
 	return cmn.Fmt("<%v>", p.Label)
 }
+
+//----------------------------------------
 
 type String struct {
 	Text string

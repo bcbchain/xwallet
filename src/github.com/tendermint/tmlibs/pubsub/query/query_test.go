@@ -18,10 +18,10 @@ func TestMatches(t *testing.T) {
 	require.NoError(t, err)
 
 	testCases := []struct {
-		s	string
-		tags	map[string]interface{}
-		err	bool
-		matches	bool
+		s       string
+		tags    map[string]interface{}
+		err     bool
+		matches bool
 	}{
 		{"tm.events.type='NewBlock'", map[string]interface{}{"tm.events.type": "NewBlock"}, false, true},
 
@@ -69,8 +69,8 @@ func TestConditions(t *testing.T) {
 	require.NoError(t, err)
 
 	testCases := []struct {
-		s		string
-		conditions	[]query.Condition
+		s          string
+		conditions []query.Condition
 	}{
 		{s: "tm.events.type='NewBlock'", conditions: []query.Condition{query.Condition{Tag: "tm.events.type", Op: query.OpEqual, Operand: "NewBlock"}}},
 		{s: "tx.gas > 7 AND tx.gas < 9", conditions: []query.Condition{query.Condition{Tag: "tx.gas", Op: query.OpGreater, Operand: int64(7)}, query.Condition{Tag: "tx.gas", Op: query.OpLess, Operand: int64(9)}}},

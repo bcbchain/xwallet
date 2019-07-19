@@ -21,8 +21,8 @@ func TestStatusIndexer(t *testing.T) {
 	assert.False(status.TxIndexEnabled())
 
 	cases := []struct {
-		expected	bool
-		other		[]string
+		expected bool
+		other    []string
 	}{
 		{false, nil},
 		{false, []string{}},

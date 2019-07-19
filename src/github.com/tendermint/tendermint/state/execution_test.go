@@ -9,7 +9,7 @@ import (
 
 	"github.com/tendermint/abci/example/kvstore"
 	abci "github.com/tendermint/abci/types"
-	crypto "github.com/tendermint/go-crypto"
+	"github.com/tendermint/go-crypto"
 	"github.com/tendermint/tendermint/proxy"
 	"github.com/tendermint/tendermint/types"
 	cmn "github.com/tendermint/tmlibs/common"
@@ -18,10 +18,10 @@ import (
 )
 
 var (
-	privKey		= crypto.GenPrivKeyEd25519FromSecret([]byte("execution_test"))
-	chainID		= "execution_chain"
-	testPartSize	= 65536
-	nTxsPerBlock	= 10
+	privKey      = crypto.GenPrivKeyEd25519FromSecret([]byte("execution_test"))
+	chainID      = "execution_chain"
+	testPartSize = 65536
+	nTxsPerBlock = 10
 )
 
 func TestApplyBlock(t *testing.T) {
@@ -33,17 +33,19 @@ func TestApplyBlock(t *testing.T) {
 
 	state, stateDB := state(), dbm.NewMemDB()
 
-	blockExec := NewBlockExecutor(stateDB, log.TestingLogger(), proxyApp.Consensus(),
+	blockExec := NewBlockExecutor(stateDB, stateDB, log.TestingLogger(), proxyApp.Consensus(),
 		types.MockMempool{}, types.MockEvidencePool{})
 
 	block := makeBlock(state, 1)
-	blockID := types.BlockID{block.Hash(), block.MakePartSet(testPartSize).Header()}
+	blockID := types.BlockID{Hash: block.Hash(), PartsHeader: block.MakePartSet(testPartSize).Header()}
 
-	state, err = blockExec.ApplyBlock(state, blockID, block)
+	_, err = blockExec.ApplyBlock(state, blockID, block)
 	require.Nil(t, err)
 
+	// TODO check state and mempool
 }
 
+// TestBeginBlockAbsentValidators ensures we send absent validators list.
 func TestBeginBlockAbsentValidators(t *testing.T) {
 	app := &testApp{}
 	cc := proxy.NewLocalClientCreator(app)
@@ -60,9 +62,9 @@ func TestBeginBlockAbsentValidators(t *testing.T) {
 
 	now := time.Now().UTC()
 	testCases := []struct {
-		desc				string
-		lastCommitPrecommits		[]*types.Vote
-		expectedAbsentValidators	[]int32
+		desc                     string
+		lastCommitPrecommits     []*types.Vote
+		expectedAbsentValidators []int32
 	}{
 		{"none absent", []*types.Vote{{ValidatorIndex: 0, Timestamp: now, Type: types.VoteTypePrecommit}, {ValidatorIndex: 1, Timestamp: now}}, []int32{}},
 		{"one absent", []*types.Vote{{ValidatorIndex: 0, Timestamp: now, Type: types.VoteTypePrecommit}, nil}, []int32{1}},
@@ -72,14 +74,16 @@ func TestBeginBlockAbsentValidators(t *testing.T) {
 	for _, tc := range testCases {
 		lastCommit := &types.Commit{BlockID: prevBlockID, Precommits: tc.lastCommitPrecommits}
 
-		block, _ := state.MakeBlock(2, makeTxs(2), lastCommit)
+		block, _ := state.MakeBlock(2, makeTxs(2), lastCommit, "", "", nil)
 		_, err = ExecCommitBlock(proxyApp.Consensus(), block, log.TestingLogger())
 		require.Nil(t, err, tc.desc)
 
+		// -> app must receive an index of the absent validator
 		assert.Equal(t, tc.expectedAbsentValidators, app.AbsentValidators, tc.desc)
 	}
 }
 
+// TestBeginBlockByzantineValidators ensures we send byzantine validators list.
 func TestBeginBlockByzantineValidators(t *testing.T) {
 	app := &testApp{}
 	cc := proxy.NewLocalClientCreator(app)
@@ -94,15 +98,15 @@ func TestBeginBlockByzantineValidators(t *testing.T) {
 	prevParts := types.PartSetHeader{}
 	prevBlockID := types.BlockID{prevHash, prevParts}
 
-	height1, idx1, val1 := int64(8), 0, []byte("val1")
-	height2, idx2, val2 := int64(3), 1, []byte("val2")
+	height1, idx1, val1 := int64(8), 0, "val1"
+	height2, idx2, val2 := int64(3), 1, "val2"
 	ev1 := types.NewMockGoodEvidence(height1, idx1, val1)
 	ev2 := types.NewMockGoodEvidence(height2, idx2, val2)
 
 	testCases := []struct {
-		desc				string
-		evidence			[]types.Evidence
-		expectedByzantineValidators	[]abci.Evidence
+		desc                        string
+		evidence                    []types.Evidence
+		expectedByzantineValidators []abci.Evidence
 	}{
 		{"none byzantine", []types.Evidence{}, []abci.Evidence{}},
 		{"one byzantine", []types.Evidence{ev1}, []abci.Evidence{{ev1.Address(), ev1.Height()}}},
@@ -114,15 +118,19 @@ func TestBeginBlockByzantineValidators(t *testing.T) {
 	for _, tc := range testCases {
 		lastCommit := &types.Commit{BlockID: prevBlockID}
 
-		block, _ := state.MakeBlock(10, makeTxs(2), lastCommit)
+		block, _ := state.MakeBlock(10, makeTxs(2), lastCommit, "", "", nil)
 		block.Evidence.Evidence = tc.evidence
 		_, err = ExecCommitBlock(proxyApp.Consensus(), block, log.TestingLogger())
 		require.Nil(t, err, tc.desc)
 
+		// -> app must receive an index of the byzantine validator
 		assert.Equal(t, tc.expectedByzantineValidators, app.ByzantineValidators, tc.desc)
 	}
 }
 
+//----------------------------------------------------------------------------
+
+// make some bogus txs
 func makeTxs(height int64) (txs []types.Tx) {
 	for i := 0; i < nTxsPerBlock; i++ {
 		txs = append(txs, types.Tx([]byte{byte(height), byte(i)}))
@@ -132,27 +140,29 @@ func makeTxs(height int64) (txs []types.Tx) {
 
 func state() State {
 	s, _ := MakeGenesisState(&types.GenesisDoc{
-		ChainID:	chainID,
+		ChainID: chainID,
 		Validators: []types.GenesisValidator{
-			{privKey.PubKey(), 10000, "test"},
+			{"", privKey.PubKey(), 10000, "test"},
 		},
-		AppHash:	nil,
+		AppHash: nil,
 	})
 	return s
 }
 
 func makeBlock(state State, height int64) *types.Block {
-	block, _ := state.MakeBlock(height, makeTxs(state.LastBlockHeight), new(types.Commit))
+	block, _ := state.MakeBlock(height, makeTxs(state.LastBlockHeight), new(types.Commit), "", "", nil)
 	return block
 }
+
+//----------------------------------------------------------------------------
 
 var _ abci.Application = (*testApp)(nil)
 
 type testApp struct {
 	abci.BaseApplication
 
-	AbsentValidators	[]int32
-	ByzantineValidators	[]abci.Evidence
+	AbsentValidators    []int32
+	ByzantineValidators []abci.Evidence
 }
 
 func NewKVStoreApplication() *testApp {

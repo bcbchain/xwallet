@@ -86,7 +86,16 @@ func TestUint16(t *testing.T) {
 }
 
 func deactivatedTestUint16s(t *testing.T) {
-
+	// This should panic on 32-bit machine
+	/*
+		countBytes := []byte{0xff, 0xff, 0xff, 0xff}
+		count := binary.BigEndian.Uint32(countBytes)
+		fmt.Println(count, int32(count))
+		size := int(2 * count)
+		x0 := make([]byte, size+4)
+		copy(x0[:4], countBytes)
+		dec.DecodeUint16s(x0)
+	*/
 	x0 := []uint16{0xff, 0xffff, 0xabcd, 0xdabc}
 	buf1 := new(bytes.Buffer)
 	n1, err1 := new(int), new(error)

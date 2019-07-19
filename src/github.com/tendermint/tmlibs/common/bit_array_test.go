@@ -232,8 +232,8 @@ func TestJSONMarshalUnmarshal(t *testing.T) {
 	bA4.SetIndex(1, true)
 
 	testCases := []struct {
-		bA		*BitArray
-		marshalledBA	string
+		bA           *BitArray
+		marshalledBA string
 	}{
 		{nil, `null`},
 		{bA1, `null`},

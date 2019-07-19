@@ -9,18 +9,21 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+// ABCIApp will send all abci related request to the named app,
+// so you can test app behavior from a client without needing
+// an entire tendermint node
 type ABCIApp struct {
 	App abci.Application
 }
 
 var (
-	_	client.ABCIClient	= ABCIApp{}
-	_	client.ABCIClient	= ABCIMock{}
-	_	client.ABCIClient	= (*ABCIRecorder)(nil)
+	_ client.ABCIClient = ABCIApp{}
+	_ client.ABCIClient = ABCIMock{}
+	_ client.ABCIClient = (*ABCIRecorder)(nil)
 )
 
 func (a ABCIApp) ABCIInfo() (*ctypes.ResultABCIInfo, error) {
-	return &ctypes.ResultABCIInfo{a.App.Info(abci.RequestInfo{version.Version})}, nil
+	return &ctypes.ResultABCIInfo{Response: a.App.Info(abci.RequestInfo{Version: version.Version})}, nil
 }
 
 func (a ABCIApp) ABCIQuery(path string, data cmn.HexBytes) (*ctypes.ResultABCIQuery, error) {
@@ -28,8 +31,8 @@ func (a ABCIApp) ABCIQuery(path string, data cmn.HexBytes) (*ctypes.ResultABCIQu
 }
 
 func (a ABCIApp) ABCIQueryWithOptions(path string, data cmn.HexBytes, opts client.ABCIQueryOptions) (*ctypes.ResultABCIQuery, error) {
-	q := a.App.Query(abci.RequestQuery{data, path, opts.Height, opts.Trusted})
-	return &ctypes.ResultABCIQuery{q}, nil
+	q := a.App.Query(abci.RequestQuery{Data: data, Path: path, Height: opts.Height, Prove: opts.Trusted})
+	return &ctypes.ResultABCIQuery{Response: q}, nil
 }
 
 func (a ABCIApp) BroadcastTxCommit(tx types.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
@@ -44,27 +47,30 @@ func (a ABCIApp) BroadcastTxCommit(tx types.Tx) (*ctypes.ResultBroadcastTxCommit
 
 func (a ABCIApp) BroadcastTxAsync(tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
 	c := a.App.CheckTx(tx)
-
+	// and this gets written in a background thread...
 	if !c.IsErr() {
-		go func() { a.App.DeliverTx(tx) }()
+		go func() { a.App.DeliverTx(tx) }() // nolint: errcheck
 	}
-	return &ctypes.ResultBroadcastTx{c.Code, c.Data, c.Log, tx.Hash()}, nil
+	return &ctypes.ResultBroadcastTx{Code: c.Code, Data: []byte(c.Data), Log: c.Log, Hash: tx.Hash()}, nil
 }
 
 func (a ABCIApp) BroadcastTxSync(tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
 	c := a.App.CheckTx(tx)
-
+	// and this gets written in a background thread...
 	if !c.IsErr() {
-		go func() { a.App.DeliverTx(tx) }()
+		go func() { a.App.DeliverTx(tx) }() // nolint: errcheck
 	}
-	return &ctypes.ResultBroadcastTx{c.Code, c.Data, c.Log, tx.Hash()}, nil
+	return &ctypes.ResultBroadcastTx{Code: c.Code, Data: []byte(c.Data), Log: c.Log, Hash: tx.Hash()}, nil
 }
 
+// ABCIMock will send all abci related request to the named app,
+// so you can test app behavior from a client without needing
+// an entire tendermint node
 type ABCIMock struct {
-	Info		Call
-	Query		Call
-	BroadcastCommit	Call
-	Broadcast	Call
+	Info            Call
+	Query           Call
+	BroadcastCommit Call
+	Broadcast       Call
 }
 
 func (m ABCIMock) ABCIInfo() (*ctypes.ResultABCIInfo, error) {
@@ -72,7 +78,7 @@ func (m ABCIMock) ABCIInfo() (*ctypes.ResultABCIInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ctypes.ResultABCIInfo{res.(abci.ResponseInfo)}, nil
+	return &ctypes.ResultABCIInfo{Response: res.(abci.ResponseInfo)}, nil
 }
 
 func (m ABCIMock) ABCIQuery(path string, data cmn.HexBytes) (*ctypes.ResultABCIQuery, error) {
@@ -85,7 +91,7 @@ func (m ABCIMock) ABCIQueryWithOptions(path string, data cmn.HexBytes, opts clie
 		return nil, err
 	}
 	resQuery := res.(abci.ResponseQuery)
-	return &ctypes.ResultABCIQuery{resQuery}, nil
+	return &ctypes.ResultABCIQuery{Response: resQuery}, nil
 }
 
 func (m ABCIMock) BroadcastTxCommit(tx types.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
@@ -112,23 +118,25 @@ func (m ABCIMock) BroadcastTxSync(tx types.Tx) (*ctypes.ResultBroadcastTx, error
 	return res.(*ctypes.ResultBroadcastTx), nil
 }
 
+// ABCIRecorder can wrap another type (ABCIApp, ABCIMock, or Client)
+// and record all ABCI related calls.
 type ABCIRecorder struct {
-	Client	client.ABCIClient
-	Calls	[]Call
+	Client client.ABCIClient
+	Calls  []Call
 }
 
 func NewABCIRecorder(client client.ABCIClient) *ABCIRecorder {
 	return &ABCIRecorder{
-		Client:	client,
-		Calls:	[]Call{},
+		Client: client,
+		Calls:  []Call{},
 	}
 }
 
 type QueryArgs struct {
-	Path	string
-	Data	cmn.HexBytes
-	Height	int64
-	Trusted	bool
+	Path    string
+	Data    cmn.HexBytes
+	Height  int64
+	Trusted bool
 }
 
 func (r *ABCIRecorder) addCall(call Call) {
@@ -138,9 +146,9 @@ func (r *ABCIRecorder) addCall(call Call) {
 func (r *ABCIRecorder) ABCIInfo() (*ctypes.ResultABCIInfo, error) {
 	res, err := r.Client.ABCIInfo()
 	r.addCall(Call{
-		Name:		"abci_info",
-		Response:	res,
-		Error:		err,
+		Name:     "abci_info",
+		Response: res,
+		Error:    err,
 	})
 	return res, err
 }
@@ -152,10 +160,10 @@ func (r *ABCIRecorder) ABCIQuery(path string, data cmn.HexBytes) (*ctypes.Result
 func (r *ABCIRecorder) ABCIQueryWithOptions(path string, data cmn.HexBytes, opts client.ABCIQueryOptions) (*ctypes.ResultABCIQuery, error) {
 	res, err := r.Client.ABCIQueryWithOptions(path, data, opts)
 	r.addCall(Call{
-		Name:		"abci_query",
-		Args:		QueryArgs{path, data, opts.Height, opts.Trusted},
-		Response:	res,
-		Error:		err,
+		Name:     "abci_query",
+		Args:     QueryArgs{path, data, opts.Height, opts.Trusted},
+		Response: res,
+		Error:    err,
 	})
 	return res, err
 }
@@ -163,10 +171,10 @@ func (r *ABCIRecorder) ABCIQueryWithOptions(path string, data cmn.HexBytes, opts
 func (r *ABCIRecorder) BroadcastTxCommit(tx types.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
 	res, err := r.Client.BroadcastTxCommit(tx)
 	r.addCall(Call{
-		Name:		"broadcast_tx_commit",
-		Args:		tx,
-		Response:	res,
-		Error:		err,
+		Name:     "broadcast_tx_commit",
+		Args:     tx,
+		Response: res,
+		Error:    err,
 	})
 	return res, err
 }
@@ -174,10 +182,10 @@ func (r *ABCIRecorder) BroadcastTxCommit(tx types.Tx) (*ctypes.ResultBroadcastTx
 func (r *ABCIRecorder) BroadcastTxAsync(tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
 	res, err := r.Client.BroadcastTxAsync(tx)
 	r.addCall(Call{
-		Name:		"broadcast_tx_async",
-		Args:		tx,
-		Response:	res,
-		Error:		err,
+		Name:     "broadcast_tx_async",
+		Args:     tx,
+		Response: res,
+		Error:    err,
 	})
 	return res, err
 }
@@ -185,10 +193,10 @@ func (r *ABCIRecorder) BroadcastTxAsync(tx types.Tx) (*ctypes.ResultBroadcastTx,
 func (r *ABCIRecorder) BroadcastTxSync(tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
 	res, err := r.Client.BroadcastTxSync(tx)
 	r.addCall(Call{
-		Name:		"broadcast_tx_sync",
-		Args:		tx,
-		Response:	res,
-		Error:		err,
+		Name:     "broadcast_tx_sync",
+		Args:     tx,
+		Response: res,
+		Error:    err,
 	})
 	return res, err
 }

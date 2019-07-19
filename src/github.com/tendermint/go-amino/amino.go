@@ -10,20 +10,25 @@ import (
 	"reflect"
 )
 
+//----------------------------------------
+// Typ3 and Typ4
+
 type Typ3 uint8
-type Typ4 uint8
+type Typ4 uint8 // Typ3 | 0x08 (pointer bit)
 
 const (
-	Typ3_Varint	= Typ3(0)
-	Typ3_8Byte	= Typ3(1)
-	Typ3_ByteLength	= Typ3(2)
-	Typ3_Struct	= Typ3(3)
-	Typ3_StructTerm	= Typ3(4)
-	Typ3_4Byte	= Typ3(5)
-	Typ3_List	= Typ3(6)
-	Typ3_Interface	= Typ3(7)
+	// Typ3 types
+	Typ3_Varint     = Typ3(0)
+	Typ3_8Byte      = Typ3(1)
+	Typ3_ByteLength = Typ3(2)
+	Typ3_Struct     = Typ3(3)
+	Typ3_StructTerm = Typ3(4)
+	Typ3_4Byte      = Typ3(5)
+	Typ3_List       = Typ3(6)
+	Typ3_Interface  = Typ3(7)
 
-	Typ4_Pointer	= Typ4(0x08)
+	// Typ4 bit
+	Typ4_Pointer = Typ4(0x08)
 )
 
 func (typ Typ3) String() string {
@@ -49,8 +54,8 @@ func (typ Typ3) String() string {
 	}
 }
 
-func (typ Typ4) Typ3() Typ3		{ return Typ3(typ & 0x07) }
-func (typ Typ4) IsPointer() bool	{ return (typ & 0x08) > 0 }
+func (typ Typ4) Typ3() Typ3      { return Typ3(typ & 0x07) }
+func (typ Typ4) IsPointer() bool { return (typ & 0x08) > 0 }
 func (typ Typ4) String() string {
 	if typ&0xF0 != 0 {
 		return fmt.Sprintf("<Invalid Typ4 %X>", byte(typ))
@@ -62,20 +67,34 @@ func (typ Typ4) String() string {
 	}
 }
 
+//----------------------------------------
+// *Codec methods
+
+// MarshalBinary encodes the object o according to the Amino spec,
+// but prefixed by a uvarint encoding of the object to encode.
+// Use MarshalBinaryBare if you don't want byte-length prefixing.
+//
+// For consistency, MarshalBinary will first dereference pointers
+// before encoding.  MarshalBinary will panic if o is a nil-pointer,
+// or if o is invalid.
 func (cdc *Codec) MarshalBinary(o interface{}) ([]byte, error) {
 
+	// Write the bytes here.
 	var buf = new(bytes.Buffer)
 
+	// Write the bz without length-prefixing.
 	bz, err := cdc.MarshalBinaryBare(o)
 	if err != nil {
 		return nil, err
 	}
 
+	// Write uvarint(len(bz)).
 	err = EncodeUvarint(buf, uint64(len(bz)))
 	if err != nil {
 		return nil, err
 	}
 
+	// Write bz.
 	_, err = buf.Write(bz)
 	if err != nil {
 		return nil, err
@@ -84,17 +103,20 @@ func (cdc *Codec) MarshalBinary(o interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// MarshalBinaryWriter writes the bytes as would be returned from
+// MarshalBinary to the writer w.
 func (cdc *Codec) MarshalBinaryWriter(w io.Writer, o interface{}) (n int64, err error) {
 	var bz, _n = []byte(nil), int(0)
 	bz, err = cdc.MarshalBinary(o)
 	if err != nil {
 		return 0, err
 	}
-	_n, err = w.Write(bz)
+	_n, err = w.Write(bz) // TODO: handle overflow in 32-bit systems.
 	n = int64(_n)
 	return
 }
 
+// Panics if error.
 func (cdc *Codec) MustMarshalBinary(o interface{}) []byte {
 	bz, err := cdc.MarshalBinary(o)
 	if err != nil {
@@ -103,14 +125,20 @@ func (cdc *Codec) MustMarshalBinary(o interface{}) []byte {
 	return bz
 }
 
+// MarshalBinaryBare encodes the object o according to the Amino spec.
+// MarshalBinaryBare doesn't prefix the byte-length of the encoding,
+// so the caller must handle framing.
 func (cdc *Codec) MarshalBinaryBare(o interface{}) ([]byte, error) {
 
+	// Dereference value if pointer.
 	var rv, _, isNilPtr = derefPointers(reflect.ValueOf(o))
 	if isNilPtr {
-
+		// NOTE: You can still do so by calling
+		// `.MarshalBinary(struct{ *SomeType })` or so on.
 		panic("MarshalBinary cannot marshal a nil pointer directly. Try wrapping in a struct?")
 	}
 
+	// Encode Amino:binary bytes.
 	var bz []byte
 	buf := new(bytes.Buffer)
 	rt := rv.Type()
@@ -127,6 +155,7 @@ func (cdc *Codec) MarshalBinaryBare(o interface{}) ([]byte, error) {
 	return bz, nil
 }
 
+// Panics if error.
 func (cdc *Codec) MustMarshalBinaryBare(o interface{}) []byte {
 	bz, err := cdc.MarshalBinaryBare(o)
 	if err != nil {
@@ -135,11 +164,15 @@ func (cdc *Codec) MustMarshalBinaryBare(o interface{}) []byte {
 	return bz
 }
 
+// Like UnmarshalBinaryBare, but will first decode the byte-length prefix.
+// UnmarshalBinary will panic if ptr is a nil-pointer.
+// Returns an error if not all of bz is consumed.
 func (cdc *Codec) UnmarshalBinary(bz []byte, ptr interface{}) error {
 	if len(bz) == 0 {
 		return errors.New("UnmarshalBinary cannot decode empty bytes")
 	}
 
+	// Read byte-length prefix.
 	u64, n := binary.Uvarint(bz)
 	if n < 0 {
 		return fmt.Errorf("Error reading msg byte-length prefix: got code %v", n)
@@ -153,14 +186,19 @@ func (cdc *Codec) UnmarshalBinary(bz []byte, ptr interface{}) error {
 	}
 	bz = bz[n:]
 
+	// Decode.
 	return cdc.UnmarshalBinaryBare(bz, ptr)
 }
 
+// Like UnmarshalBinaryBare, but will first read the byte-length prefix.
+// UnmarshalBinaryReader will panic if ptr is a nil-pointer.
+// If maxSize is 0, there is no limit (not recommended).
 func (cdc *Codec) UnmarshalBinaryReader(r io.Reader, ptr interface{}, maxSize int64) (n int64, err error) {
 	if maxSize < 0 {
 		panic("maxSize cannot be negative.")
 	}
 
+	// Read byte-length prefix.
 	var l int64
 	var buf [binary.MaxVarintLen64]byte
 	for i := 0; i < len(buf); i++ {
@@ -195,6 +233,7 @@ func (cdc *Codec) UnmarshalBinaryReader(r io.Reader, ptr interface{}, maxSize in
 		err = fmt.Errorf("Read overflow, this implementation can't read this because, why would anyone have this much data? Hello from 2018.")
 	}
 
+	// Read that many bytes.
 	var bz = make([]byte, l, l)
 	_, err = io.ReadFull(r, bz)
 	if err != nil {
@@ -202,10 +241,12 @@ func (cdc *Codec) UnmarshalBinaryReader(r io.Reader, ptr interface{}, maxSize in
 	}
 	n += l
 
+	// Decode.
 	err = cdc.UnmarshalBinaryBare(bz, ptr)
 	return
 }
 
+// Panics if error.
 func (cdc *Codec) MustUnmarshalBinary(bz []byte, ptr interface{}) {
 	err := cdc.UnmarshalBinary(bz, ptr)
 	if err != nil {
@@ -213,6 +254,7 @@ func (cdc *Codec) MustUnmarshalBinary(bz []byte, ptr interface{}) {
 	}
 }
 
+// UnmarshalBinaryBare will panic if ptr is a nil-pointer.
 func (cdc *Codec) UnmarshalBinaryBare(bz []byte, ptr interface{}) error {
 	if len(bz) == 0 {
 		return errors.New("UnmarshalBinaryBare cannot decode empty bytes")
@@ -237,6 +279,7 @@ func (cdc *Codec) UnmarshalBinaryBare(bz []byte, ptr interface{}) error {
 	return nil
 }
 
+// Panics if error.
 func (cdc *Codec) MustUnmarshalBinaryBare(bz []byte, ptr interface{}) {
 	err := cdc.UnmarshalBinaryBare(bz, ptr)
 	if err != nil {
@@ -250,6 +293,16 @@ func (cdc *Codec) MarshalJSON(o interface{}) ([]byte, error) {
 		return []byte("null"), nil
 	}
 	rt := rv.Type()
+
+	// Note that we can't yet skip directly
+	// to checking if a type implements
+	// json.Marshaler because in some cases
+	// var s GenericInterface = t1(v1)
+	// var t GenericInterface = t2(v1)
+	// but we need to be able to encode
+	// both s and t disambiguated, so:
+	//    {"type":<disfix>, "value":<data>}
+	// for the above case.
 
 	w := new(bytes.Buffer)
 	info, err := cdc.getTypeInfo_wlock(rt)
@@ -272,6 +325,13 @@ func (cdc *Codec) UnmarshalJSON(bz []byte, ptr interface{}) error {
 		return errors.New("UnmarshalJSON expects a pointer")
 	}
 
+	// If the type implements json.Unmarshaler, just
+	// automatically respect that and skip to it.
+	// if rv.Type().Implements(jsonUnmarshalerType) {
+	// 	return rv.Interface().(json.Unmarshaler).UnmarshalJSON(bz)
+	// }
+
+	// 1. Dereference until we find the first addressable type.
 	rv = rv.Elem()
 	rt := rv.Type()
 	info, err := cdc.getTypeInfo_wlock(rt)
@@ -281,6 +341,8 @@ func (cdc *Codec) UnmarshalJSON(bz []byte, ptr interface{}) error {
 	return cdc.decodeReflectJSON(bz, info, rv, FieldOptions{})
 }
 
+// MarshalJSONIndent calls json.Indent on the output of cdc.MarshalJSON
+// using the given prefix and indent string.
 func (cdc *Codec) MarshalJSONIndent(o interface{}, prefix, indent string) ([]byte, error) {
 	bz, err := cdc.MarshalJSON(o)
 	if err != nil {
@@ -294,8 +356,11 @@ func (cdc *Codec) MarshalJSONIndent(o interface{}, prefix, indent string) ([]byt
 	return out.Bytes(), nil
 }
 
+//----------------------------------------
+// Misc.
+
 var (
-	jsonMarshalerType	= reflect.TypeOf(new(json.Marshaler)).Elem()
-	jsonUnmarshalerType	= reflect.TypeOf(new(json.Unmarshaler)).Elem()
-	errorType		= reflect.TypeOf(new(error)).Elem()
+	jsonMarshalerType   = reflect.TypeOf(new(json.Marshaler)).Elem()
+	jsonUnmarshalerType = reflect.TypeOf(new(json.Unmarshaler)).Elem()
+	errorType           = reflect.TypeOf(new(error)).Elem()
 )

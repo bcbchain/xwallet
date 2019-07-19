@@ -8,15 +8,15 @@ import (
 )
 
 type Foo struct {
-	a	string
-	b	int
-	c	[]*Foo
-	D	string
+	a string
+	b int
+	c []*Foo
+	D string // exposed
 }
 
 type pair struct {
-	Key	string
-	Value	interface{}
+	Key   string
+	Value interface{}
 }
 
 func (pr pair) get(key string) (value interface{}) {
@@ -52,10 +52,10 @@ func TestMarshalAmino(t *testing.T) {
 	cdc.RegisterConcrete(([]*Foo)(nil), "[]*Foo", nil)
 
 	var f = Foo{
-		a:	"K",
-		b:	2,
-		c:	[]*Foo{nil, nil, nil},
-		D:	"J",
+		a: "K",
+		b: 2,
+		c: []*Foo{nil, nil, nil},
+		D: "J",
 	}
 	bz, err := cdc.MarshalBinary(f)
 	assert.Nil(t, err)

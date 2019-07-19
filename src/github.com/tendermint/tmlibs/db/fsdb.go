@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	keyPerm	= os.FileMode(0600)
-	dirPerm	= os.FileMode(0700)
+	keyPerm = os.FileMode(0600)
+	dirPerm = os.FileMode(0700)
 )
 
 func init() {
@@ -27,9 +27,10 @@ func init() {
 
 var _ DB = (*FSDB)(nil)
 
+// It's slow.
 type FSDB struct {
-	mtx	sync.Mutex
-	dir	string
+	mtx sync.Mutex
+	dir string
 }
 
 func NewFSDB(dir string) *FSDB {
@@ -81,6 +82,7 @@ func (db *FSDB) SetSync(key []byte, value []byte) {
 	db.SetNoLock(key, value)
 }
 
+// NOTE: Implements atomicSetDeleter.
 func (db *FSDB) SetNoLock(key []byte, value []byte) {
 	key = escapeKey(key)
 	value = nonNilBytes(value)
@@ -105,6 +107,7 @@ func (db *FSDB) DeleteSync(key []byte) {
 	db.DeleteNoLock(key)
 }
 
+// NOTE: Implements atomicSetDeleter.
 func (db *FSDB) DeleteNoLock(key []byte) {
 	key = escapeKey(key)
 	path := db.nameToPath(key)
@@ -117,7 +120,7 @@ func (db *FSDB) DeleteNoLock(key []byte) {
 }
 
 func (db *FSDB) Close() {
-
+	// Nothing to do.
 }
 
 func (db *FSDB) Print() {
@@ -138,6 +141,8 @@ func (db *FSDB) NewBatch() Batch {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 
+	// Not sure we would ever want to try...
+	// It doesn't seem easy for general filesystems.
 	panic("FSDB.NewBatch not yet implemented")
 }
 
@@ -149,6 +154,8 @@ func (db *FSDB) Iterator(start, end []byte) Iterator {
 	db.mtx.Lock()
 	defer db.mtx.Unlock()
 
+	// We need a copy of all of the keys.
+	// Not the best, but probably not a bottleneck depending.
 	keys, err := list(db.dir, start, end)
 	if err != nil {
 		panic(errors.Wrapf(err, "Listing keys in %s", db.dir))
@@ -158,7 +165,7 @@ func (db *FSDB) Iterator(start, end []byte) Iterator {
 }
 
 func (db *FSDB) ReverseIterator(start, end []byte) Iterator {
-	panic("not implemented yet")
+	panic("not implemented yet") // XXX
 }
 
 func (db *FSDB) nameToPath(name []byte) string {
@@ -166,6 +173,8 @@ func (db *FSDB) nameToPath(name []byte) string {
 	return filepath.Join(db.dir, n)
 }
 
+// Read some bytes to a file.
+// CONTRACT: returns os errors directly without wrapping.
 func read(path string) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -180,6 +189,8 @@ func read(path string) ([]byte, error) {
 	return d, nil
 }
 
+// Write some bytes from a file.
+// CONTRACT: returns os errors directly without wrapping.
 func write(path string, d []byte) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, keyPerm)
 	if err != nil {
@@ -194,10 +205,14 @@ func write(path string, d []byte) error {
 	return err
 }
 
+// Remove a file.
+// CONTRACT: returns os errors directly without wrapping.
 func remove(path string) error {
 	return os.Remove(path)
 }
 
+// List keys in a directory, stripping of escape sequences and dir portions.
+// CONTRACT: returns os errors directly without wrapping.
 func list(dirPath string, start, end []byte) ([]string, error) {
 	dir, err := os.Open(dirPath)
 	if err != nil {
@@ -223,6 +238,8 @@ func list(dirPath string, start, end []byte) ([]string, error) {
 	return keys, nil
 }
 
+// To support empty or nil keys, while the file system doesn't allow empty
+// filenames.
 func escapeKey(key []byte) []byte {
 	return []byte("k_" + string(key))
 }

@@ -7,8 +7,8 @@ import (
 )
 
 type PrefixedReader struct {
-	Prefix	[]byte
-	reader	io.Reader
+	Prefix []byte
+	reader io.Reader
 }
 
 func NewPrefixedReader(prefix []byte, reader io.Reader) *PrefixedReader {
@@ -24,9 +24,10 @@ func (pr *PrefixedReader) Read(p []byte) (n int, err error) {
 	return pr.reader.Read(p)
 }
 
+// NOTE: Not goroutine safe
 type BufferCloser struct {
 	bytes.Buffer
-	Closed	bool
+	Closed bool
 }
 
 func NewBufferCloser(buf []byte) *BufferCloser {

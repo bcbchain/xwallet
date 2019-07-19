@@ -9,10 +9,15 @@ import (
 )
 
 const (
-	dialRetryIntervalSeconds	= 3
-	echoRetryIntervalSeconds	= 1
+	dialRetryIntervalSeconds = 3
+	echoRetryIntervalSeconds = 1
 )
 
+// Client defines an interface for an ABCI client.
+// All `Async` methods return a `ReqRes` object.
+// All `Sync` methods return the appropriate protobuf ResponseXxx struct and an error.
+// Note these are client errors, eg. ABCI socket connectivity issues.
+// Application-related errors are reflected in response via ABCI error codes and logs.
 type Client interface {
 	cmn.Service
 
@@ -44,6 +49,10 @@ type Client interface {
 	EndBlockSync(types.RequestEndBlock) (*types.ResponseEndBlock, error)
 }
 
+//----------------------------------------
+
+// NewClient returns a new ABCI client of the specified transport type.
+// It returns an error if the transport is not "socket" or "grpc"
 func NewClient(addr, transport string, mustConnect bool) (client Client, err error) {
 	switch transport {
 	case "socket":
@@ -56,29 +65,37 @@ func NewClient(addr, transport string, mustConnect bool) (client Client, err err
 	return
 }
 
+//----------------------------------------
+
 type Callback func(*types.Request, *types.Response)
+
+//----------------------------------------
 
 type ReqRes struct {
 	*types.Request
 	*sync.WaitGroup
-	*types.Response
+	*types.Response // Not set atomically, so be sure to use WaitGroup.
 
-	mtx	sync.Mutex
-	done	bool
-	cb	func(*types.Response)
+	mtx  sync.Mutex
+	done bool                  // Gets set to true once *after* WaitGroup.Done().
+	cb   func(*types.Response) // A single callback that may be set.
 }
 
 func NewReqRes(req *types.Request) *ReqRes {
 	return &ReqRes{
-		Request:	req,
-		WaitGroup:	waitGroup1(),
-		Response:	nil,
+		Request:   req,
+		WaitGroup: waitGroup1(),
+		Response:  nil,
 
-		done:	false,
-		cb:	nil,
+		done: false,
+		cb:   nil,
 	}
 }
 
+// Sets the callback for this ReqRes atomically.
+// If reqRes is already done, calls cb immediately.
+// NOTE: reqRes.cb should not change if reqRes.done.
+// NOTE: only one callback is supported.
 func (reqRes *ReqRes) SetCallback(cb func(res *types.Response)) {
 	reqRes.mtx.Lock()
 
@@ -98,6 +115,7 @@ func (reqRes *ReqRes) GetCallback() func(*types.Response) {
 	return reqRes.cb
 }
 
+// NOTE: it should be safe to read reqRes.cb without locks after this.
 func (reqRes *ReqRes) SetDone() {
 	reqRes.mtx.Lock()
 	reqRes.done = true

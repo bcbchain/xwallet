@@ -1,5 +1,14 @@
 package bcrypt
 
+// MODIFIED BY TENDERMINT TO EXPOSE NONCE
+// Copyright 2011 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Package bcrypt implements Provos and Mazières's bcrypt adaptive hashing
+// algorithm. See http://www.usenix.org/event/usenix99/provos/provos.pdf
+
+// The code is a port of Provos and Mazières's C implementation.
 import (
 	"crypto/subtle"
 	"errors"
@@ -10,21 +19,28 @@ import (
 )
 
 const (
-	MinCost		int	= 4
-	MaxCost		int	= 31
-	DefaultCost	int	= 10
+	MinCost     int = 4  // the minimum allowable cost as passed in to GenerateFromPassword
+	MaxCost     int = 31 // the maximum allowable cost as passed in to GenerateFromPassword
+	DefaultCost int = 10 // the cost that will actually be set if a cost below MinCost is passed into GenerateFromPassword
 )
 
+// The error returned from CompareHashAndPassword when a password and hash do
+// not match.
 var ErrMismatchedHashAndPassword = errors.New("crypto/bcrypt: hashedPassword is not the hash of the given password")
 
+// The error returned from CompareHashAndPassword when a hash is too short to
+// be a bcrypt hash.
 var ErrHashTooShort = errors.New("crypto/bcrypt: hashedSecret too short to be a bcrypted password")
 
+// The error returned from CompareHashAndPassword when a hash was created with
+// a bcrypt algorithm newer than this implementation.
 type HashVersionTooNewError byte
 
 func (hv HashVersionTooNewError) Error() string {
 	return fmt.Sprintf("crypto/bcrypt: bcrypt algorithm version '%c' requested is newer than current version '%c'", byte(hv), majorVersion)
 }
 
+// The error returned from CompareHashAndPassword when a hash starts with something other than '$'
 type InvalidHashPrefixError byte
 
 func (ih InvalidHashPrefixError) Error() string {
@@ -34,19 +50,21 @@ func (ih InvalidHashPrefixError) Error() string {
 type InvalidCostError int
 
 func (ic InvalidCostError) Error() string {
-	return fmt.Sprintf("crypto/bcrypt: cost %d is outside allowed range (%d,%d)", int(ic), int(MinCost), int(MaxCost))
+	return fmt.Sprintf("crypto/bcrypt: cost %d is outside allowed range (%d,%d)", int(ic), int(MinCost), int(MaxCost)) // nolint: unconvert
 }
 
 const (
-	majorVersion		= '2'
-	minorVersion		= 'a'
-	maxSaltSize		= 16
-	maxCryptedHashSize	= 23
-	encodedSaltSize		= 22
-	encodedHashSize		= 31
-	minHashSize		= 59
+	majorVersion       = '2'
+	minorVersion       = 'a'
+	maxSaltSize        = 16
+	maxCryptedHashSize = 23
+	encodedSaltSize    = 22
+	encodedHashSize    = 31
+	minHashSize        = 59
 )
 
+// magicCipherData is an IV for the 64 Blowfish encryption calls in
+// bcrypt(). It's the string "OrpheanBeholderScryDoubt" in big-endian bytes.
 var magicCipherData = []byte{
 	0x4f, 0x72, 0x70, 0x68,
 	0x65, 0x61, 0x6e, 0x42,
@@ -57,13 +75,17 @@ var magicCipherData = []byte{
 }
 
 type hashed struct {
-	hash	[]byte
-	salt	[]byte
-	cost	int
-	major	byte
-	minor	byte
+	hash  []byte
+	salt  []byte
+	cost  int // allowed range is MinCost to MaxCost
+	major byte
+	minor byte
 }
 
+// GenerateFromPassword returns the bcrypt hash of the password at the given
+// cost. If the cost given is less than MinCost, the cost will be set to
+// DefaultCost, instead. Use CompareHashAndPassword, as defined in this package,
+// to compare the returned hashed password with its cleartext version.
 func GenerateFromPassword(salt []byte, password []byte, cost int) ([]byte, error) {
 	if len(salt) != maxSaltSize {
 		return nil, fmt.Errorf("Salt len must be %v", maxSaltSize)
@@ -75,6 +97,8 @@ func GenerateFromPassword(salt []byte, password []byte, cost int) ([]byte, error
 	return p.Hash(), nil
 }
 
+// CompareHashAndPassword compares a bcrypt hashed password with its possible
+// plaintext equivalent. Returns nil on success, or an error on failure.
 func CompareHashAndPassword(hashedPassword, password []byte) error {
 	p, err := newFromHash(hashedPassword)
 	if err != nil {
@@ -94,6 +118,10 @@ func CompareHashAndPassword(hashedPassword, password []byte) error {
 	return ErrMismatchedHashAndPassword
 }
 
+// Cost returns the hashing cost used to create the given hashed
+// password. When, in the future, the hashing cost of a password system needs
+// to be increased in order to adjust for greater computational power, this
+// function allows one to establish which passwords need to be updated.
 func Cost(hashedPassword []byte) (int, error) {
 	p, err := newFromHash(hashedPassword)
 	if err != nil {
@@ -141,6 +169,8 @@ func newFromHash(hashedSecret []byte) (*hashed, error) {
 	}
 	hashedSecret = hashedSecret[n:]
 
+	// The "+2" is here because we'll have to append at most 2 '=' to the salt
+	// when base64 decoding it in expensiveBlowfishSetup().
 	p.salt = make([]byte, encodedSaltSize, encodedSaltSize+2)
 	copy(p.salt, hashedSecret[:encodedSaltSize])
 
@@ -166,6 +196,8 @@ func bcrypt(password []byte, cost int, salt []byte) ([]byte, error) {
 		}
 	}
 
+	// Bug compatibility with C bcrypt implementations. We only encode 23 of
+	// the 24 bytes encrypted.
 	hsh := base64Encode(cipherData[:maxCryptedHashSize])
 	return hsh, nil
 }
@@ -177,6 +209,8 @@ func expensiveBlowfishSetup(key []byte, cost uint32, salt []byte) (*blowfish.Cip
 		return nil, err
 	}
 
+	// Bug compatibility with C bcrypt implementations. They use the trailing
+	// NULL in the key string during expansion.
 	ckey := append(key, 0)
 
 	c, err := blowfish.NewSaltedCipher(ckey, csalt)
@@ -232,6 +266,7 @@ func (p *hashed) decodeVersion(sbytes []byte) (int, error) {
 	return n, nil
 }
 
+// sbytes should begin where decodeVersion left off.
 func (p *hashed) decodeCost(sbytes []byte) (int, error) {
 	cost, err := strconv.Atoi(string(sbytes[0:2]))
 	if err != nil {

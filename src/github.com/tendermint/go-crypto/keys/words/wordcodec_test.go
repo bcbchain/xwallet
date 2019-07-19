@@ -13,22 +13,22 @@ func TestLengthCalc(t *testing.T) {
 	assert := asrt.New(t)
 
 	cases := []struct {
-		bytes, words	int
-		flexible	bool
+		bytes, words int
+		flexible     bool
 	}{
 		{1, 1, false},
 		{2, 2, false},
-
+		// bytes pairs with same word count
 		{3, 3, true},
 		{4, 3, true},
 		{5, 4, false},
-
+		// bytes pairs with same word count
 		{10, 8, true},
 		{11, 8, true},
 		{12, 9, false},
 		{13, 10, false},
 		{20, 15, false},
-
+		// bytes pairs with same word count
 		{21, 16, true},
 		{32, 24, true},
 	}
@@ -42,7 +42,7 @@ func TestLengthCalc(t *testing.T) {
 		if !flex {
 			assert.Equal(tc.bytes, bl, "%d", tc.words)
 		} else {
-
+			// check if it is either tc.bytes or tc.bytes +1
 			choices := []int{tc.bytes, tc.bytes + 1}
 			assert.Contains(choices, bl, "%d", tc.words)
 		}
@@ -56,16 +56,17 @@ func TestEncodeDecode(t *testing.T) {
 	require.Nil(err, "%+v", err)
 
 	cases := [][]byte{
-		{7, 8, 9},
-		{12, 54, 99, 11},
-		{0, 54, 99, 11},
-		{1, 2, 3, 4, 5},
-		{0, 0, 0, 0, 122, 23, 82, 195},
-		{0, 0, 0, 0, 5, 22, 123, 55, 22},
-		{22, 44, 55, 1, 13, 0, 0, 0, 0},
-		{0, 5, 253, 2, 0},
-		{255, 196, 172, 234, 192, 255},
-		{255, 196, 172, 1, 234, 192, 255},
+		{7, 8, 9},                         // TODO: 3 words -> 3 or 4 bytes
+		{12, 54, 99, 11},                  // TODO: 3 words -> 3 or 4 bytes
+		{0, 54, 99, 11},                   // TODO: 3 words -> 3 or 4 bytes, detect leading 0
+		{1, 2, 3, 4, 5},                   // normal
+		{0, 0, 0, 0, 122, 23, 82, 195},    // leading 0s (8 chars, unclear)
+		{0, 0, 0, 0, 5, 22, 123, 55, 22},  // leading 0s (9 chars, clear)
+		{22, 44, 55, 1, 13, 0, 0, 0, 0},   // trailing 0s (9 chars, clear)
+		{0, 5, 253, 2, 0},                 // leading and trailing zeros
+		{255, 196, 172, 234, 192, 255},    // big numbers
+		{255, 196, 172, 1, 234, 192, 255}, // big numbers, two length choices
+		// others?
 	}
 
 	for i, tc := range cases {
@@ -94,18 +95,18 @@ func TestCheckInvalidLists(t *testing.T) {
 			list[i] = cmn.RandStr(8)
 		}
 	}
-
+	// create one single duplicate
 	dups[192] = dups[782]
 
 	cases := []struct {
-		words		[]string
-		loadable	bool
-		valid		bool
+		words    []string
+		loadable bool
+		valid    bool
 	}{
 		{trivial, false, false},
 		{short, false, false},
 		{long, false, false},
-		{dups, true, false},
+		{dups, true, false}, // we only check dups on first use...
 		{right, true, true},
 	}
 
@@ -160,14 +161,17 @@ func TestCheckTypoDetection(t *testing.T) {
 			assert.Nil(err, "%s: %+v", bank, err)
 			assert.Equal(data, good, bank)
 
+			// now try some tweaks...
 			cut := words[1:]
 			_, err = codec.WordsToBytes(cut)
 			assert.NotNil(err, "%s: %s", bank, words)
 
+			// swap a word within the bank, should fails
 			words[3] = getDiffWord(codec, words[3])
 			_, err = codec.WordsToBytes(words)
 			assert.NotNil(err, "%s: %s", bank, words)
 
+			// put a random word here, must fail
 			words[3] = cmn.RandStr(10)
 			_, err = codec.WordsToBytes(words)
 			assert.NotNil(err, "%s: %s", bank, words)

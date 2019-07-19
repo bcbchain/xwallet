@@ -13,15 +13,15 @@ func TestMarshalBinary(t *testing.T) {
 	var cdc = amino.NewCodec()
 
 	type SimpleStruct struct {
-		String	string
-		Bytes	[]byte
-		Time	time.Time
+		String string
+		Bytes  []byte
+		Time   time.Time
 	}
 
 	s := SimpleStruct{
-		String:	"hello",
-		Bytes:	[]byte("goodbye"),
-		Time:	time.Now().UTC().Truncate(time.Millisecond),
+		String: "hello",
+		Bytes:  []byte("goodbye"),
+		Time:   time.Now().UTC().Truncate(time.Millisecond), // strip monotonic and timezone.
 	}
 
 	b, err := cdc.MarshalBinary(s)
@@ -38,15 +38,15 @@ func TestUnmarshalBinaryReader(t *testing.T) {
 	var cdc = amino.NewCodec()
 
 	type SimpleStruct struct {
-		String	string
-		Bytes	[]byte
-		Time	time.Time
+		String string
+		Bytes  []byte
+		Time   time.Time
 	}
 
 	s := SimpleStruct{
-		String:	"hello",
-		Bytes:	[]byte("goodbye"),
-		Time:	time.Now().UTC().Truncate(time.Millisecond),
+		String: "hello",
+		Bytes:  []byte("goodbye"),
+		Time:   time.Now().UTC().Truncate(time.Millisecond), // strip monotonic and timezone.
 	}
 
 	b, err := cdc.MarshalBinary(s)
@@ -100,15 +100,15 @@ func TestUnmarshalBinaryReaderTooLong(t *testing.T) {
 	var cdc = amino.NewCodec()
 
 	type SimpleStruct struct {
-		String	string
-		Bytes	[]byte
-		Time	time.Time
+		String string
+		Bytes  []byte
+		Time   time.Time
 	}
 
 	s := SimpleStruct{
-		String:	"hello",
-		Bytes:	[]byte("goodbye"),
-		Time:	time.Now().UTC().Truncate(time.Millisecond),
+		String: "hello",
+		Bytes:  []byte("goodbye"),
+		Time:   time.Now().UTC().Truncate(time.Millisecond), // strip monotonic and timezone.
 	}
 
 	b, err := cdc.MarshalBinary(s)
@@ -116,7 +116,7 @@ func TestUnmarshalBinaryReaderTooLong(t *testing.T) {
 	t.Logf("MarshalBinary(s) -> %X", b)
 
 	var s2 SimpleStruct
-	_, err = cdc.UnmarshalBinaryReader(bytes.NewBuffer(b), &s2, 1)
+	_, err = cdc.UnmarshalBinaryReader(bytes.NewBuffer(b), &s2, 1) // 1 byte limit is ridiculous.
 	assert.NotNil(t, err)
 }
 
@@ -124,6 +124,7 @@ func TestUnmarshalBinaryBufferedWritesReads(t *testing.T) {
 	var cdc = amino.NewCodec()
 	var buf = bytes.NewBuffer(nil)
 
+	// Write 3 times.
 	var s1 string = "foo"
 	_, err := cdc.MarshalBinaryWriter(buf, s1)
 	assert.Nil(t, err)
@@ -132,6 +133,7 @@ func TestUnmarshalBinaryBufferedWritesReads(t *testing.T) {
 	_, err = cdc.MarshalBinaryWriter(buf, s1)
 	assert.Nil(t, err)
 
+	// Read 3 times.
 	var s2 string
 	_, err = cdc.UnmarshalBinaryReader(buf, &s2, 0)
 	assert.Nil(t, err)
@@ -143,6 +145,7 @@ func TestUnmarshalBinaryBufferedWritesReads(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, s1, s2)
 
+	// Reading 4th time fails.
 	_, err = cdc.UnmarshalBinaryReader(buf, &s2, 0)
 	assert.NotNil(t, err)
 }

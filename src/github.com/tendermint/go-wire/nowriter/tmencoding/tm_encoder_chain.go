@@ -3,11 +3,14 @@ package tmencoding
 import "bytes"
 import "time"
 
+// assert adaptor works at compile time to fulfill TMEncoderBuilder
 var _ TMEncoderBuilder = (*TMEncoderChain)(nil)
 
+// wrap a BytesOut encoder with a standard stateful bytes.Buffer
+// to provide the TMEncoderBuilder
 type TMEncoderChain struct {
-	buf	bytes.Buffer
-	pure	TMEncoderPure
+	buf  bytes.Buffer
+	pure TMEncoderPure
 }
 
 func NewTMEncoderChain(pure TMEncoderPure) *TMEncoderChain {

@@ -9,9 +9,9 @@ import (
 func TestProtocolAndAddress(t *testing.T) {
 
 	cases := []struct {
-		fullAddr	string
-		proto		string
-		addr		string
+		fullAddr string
+		proto    string
+		addr     string
 	}{
 		{
 			"tcp://mydomain:80",

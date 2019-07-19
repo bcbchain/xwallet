@@ -28,9 +28,9 @@ func TestMarshalJSON(t *testing.T) {
 	var cdc = amino.NewCodec()
 	registerTransports(cdc)
 	cases := []struct {
-		in	interface{}
-		want	string
-		wantErr	string
+		in      interface{}
+		want    string
+		wantErr string
 	}{
 		{&noFields{}, "{}", ""},
 		{&noExportedFields{a: 10, b: "foo"}, "{}", ""},
@@ -87,13 +87,14 @@ func TestMarshalJSON(t *testing.T) {
 			`"Tendermint"`, "",
 		},
 
+		// We don't yet support interface pointer registration i.e. `*interface{}`
 		{interfacePtr("a"), "", "Unregistered interface interface {}"},
 
 		{&fp{"Foo", 10}, "<FP-MARSHALJSON>", ""},
 		{(*fp)(nil), "null", ""},
 		{struct {
-			FP	*fp
-			Package	string
+			FP      *fp
+			Package string
 		}{FP: &fp{"Foo", 10}, Package: "bytes"},
 			`{"FP":<FP-MARSHALJSON>,"Package":"bytes"}`, ""},
 	}
@@ -124,15 +125,15 @@ func TestMarshalJSONWithMonotonicTime(t *testing.T) {
 	registerTransports(cdc)
 
 	type SimpleStruct struct {
-		String	string
-		Bytes	[]byte
-		Time	time.Time
+		String string
+		Bytes  []byte
+		Time   time.Time
 	}
 
 	s := SimpleStruct{
-		String:	"hello",
-		Bytes:	[]byte("goodbye"),
-		Time:	time.Now().UTC().Truncate(time.Millisecond),
+		String: "hello",
+		Bytes:  []byte("goodbye"),
+		Time:   time.Now().UTC().Truncate(time.Millisecond), // strip monotonic and timezone.
 	}
 
 	b, err := cdc.MarshalJSON(s)
@@ -145,8 +146,8 @@ func TestMarshalJSONWithMonotonicTime(t *testing.T) {
 }
 
 type fp struct {
-	Name	string
-	Version	int
+	Name    string
+	Version int
 }
 
 func (f *fp) MarshalJSON() ([]byte, error) {
@@ -162,8 +163,8 @@ var _ json.Marshaler = (*fp)(nil)
 var _ json.Unmarshaler = (*fp)(nil)
 
 type innerFP struct {
-	PC	uint64
-	FP	*fp
+	PC uint64
+	FP *fp
 }
 
 func TestUnmarshalMap(t *testing.T) {
@@ -171,7 +172,7 @@ func TestUnmarshalMap(t *testing.T) {
 	jsonBytes := []byte(`{"2": 2}`)
 	obj := new(map[string]int)
 	cdc := amino.NewCodec()
-
+	// Binary doesn't support decoding to a map...
 	assert.Panics(t, func() {
 		err := cdc.UnmarshalBinary(binBytes, &obj)
 		assert.Fail(t, "should have paniced but got err: %v", err)
@@ -180,12 +181,12 @@ func TestUnmarshalMap(t *testing.T) {
 		err := cdc.UnmarshalBinary(binBytes, obj)
 		assert.Fail(t, "should have paniced but got err: %v", err)
 	})
-
+	// ... nor encoding it.
 	assert.Panics(t, func() {
 		bz, err := cdc.MarshalBinary(obj)
 		assert.Fail(t, "should have paniced but got bz: %X err: %v", bz, err)
 	})
-
+	// JSON doesn't support decoding to a map...
 	assert.Panics(t, func() {
 		err := cdc.UnmarshalJSON(jsonBytes, &obj)
 		assert.Fail(t, "should have paniced but got err: %v", err)
@@ -194,7 +195,7 @@ func TestUnmarshalMap(t *testing.T) {
 		err := cdc.UnmarshalJSON(jsonBytes, obj)
 		assert.Fail(t, "should have paniced but got err: %v", err)
 	})
-
+	// ... nor encoding it.
 	assert.Panics(t, func() {
 		bz, err := cdc.MarshalJSON(obj)
 		assert.Fail(t, "should have paniced but got bz: %X err: %v", bz, err)
@@ -206,7 +207,7 @@ func TestUnmarshalFunc(t *testing.T) {
 	jsonBytes := []byte(`"dontcare"`)
 	obj := func() {}
 	cdc := amino.NewCodec()
-
+	// Binary doesn't support decoding to a func...
 	assert.Panics(t, func() {
 		err := cdc.UnmarshalBinary(binBytes, &obj)
 		assert.Fail(t, "should have paniced but got err: %v", err)
@@ -215,12 +216,12 @@ func TestUnmarshalFunc(t *testing.T) {
 		err := cdc.UnmarshalBinary(binBytes, obj)
 		assert.Fail(t, "should have paniced but got err: %v", err)
 	})
-
+	// ... nor encoding it.
 	assert.Panics(t, func() {
 		bz, err := cdc.MarshalBinary(obj)
 		assert.Fail(t, "should have paniced but got bz: %X err: %v", bz, err)
 	})
-
+	// JSON doesn't support decoding to a func...
 	assert.Panics(t, func() {
 		err := cdc.UnmarshalJSON(jsonBytes, &obj)
 		assert.Fail(t, "should have paniced but got err: %v", err)
@@ -229,7 +230,7 @@ func TestUnmarshalFunc(t *testing.T) {
 		err := cdc.UnmarshalJSON(jsonBytes, obj)
 		assert.Fail(t, "should have paniced but got err: %v", err)
 	})
-
+	// ... nor encoding it.
 	assert.Panics(t, func() {
 		bz, err := cdc.MarshalJSON(obj)
 		assert.Fail(t, "should have paniced but got bz: %X err: %v", bz, err)
@@ -241,10 +242,10 @@ func TestUnmarshalJSON(t *testing.T) {
 	var cdc = amino.NewCodec()
 	registerTransports(cdc)
 	cases := []struct {
-		blob	string
-		in	interface{}
-		want	interface{}
-		wantErr	string
+		blob    string
+		in      interface{}
+		want    interface{}
+		wantErr string
 	}{
 		{
 			"null", 2, nil, "expects a pointer",
@@ -265,8 +266,8 @@ func TestUnmarshalJSON(t *testing.T) {
 			`{"type":"AEB127E121A6B0","value":{"Vehicle":{"type":"2B2961A431B238","value":"Bugatti"},"Capacity":10}}`,
 			new(Transport),
 			&Transport{
-				Vehicle:	Car("Bugatti"),
-				Capacity:	10,
+				Vehicle:  Car("Bugatti"),
+				Capacity: 10,
 			}, "",
 		},
 		{
@@ -323,40 +324,40 @@ func TestJSONCodecRoundTrip(t *testing.T) {
 	var cdc = amino.NewCodec()
 	registerTransports(cdc)
 	type allInclusive struct {
-		Tr	Transport	`json:"trx"`
-		Vehicle	Vehicle		`json:"v,omitempty"`
-		Comment	string
-		Data	[]byte
+		Tr      Transport `json:"trx"`
+		Vehicle Vehicle   `json:"v,omitempty"`
+		Comment string
+		Data    []byte
 	}
 
 	cases := []struct {
-		in	interface{}
-		want	interface{}
-		out	interface{}
-		wantErr	string
+		in      interface{}
+		want    interface{}
+		out     interface{}
+		wantErr string
 	}{
 		0: {
 			in: &allInclusive{
 				Tr: Transport{
 					Vehicle: Boat("Oracle"),
 				},
-				Comment:	"To the Cosmos! баллинг в космос",
-				Data:		[]byte("祝你好运"),
+				Comment: "To the Cosmos! баллинг в космос",
+				Data:    []byte("祝你好运"),
 			},
-			out:	new(allInclusive),
+			out: new(allInclusive),
 			want: &allInclusive{
 				Tr: Transport{
 					Vehicle: Boat("Oracle"),
 				},
-				Comment:	"To the Cosmos! баллинг в космос",
-				Data:		[]byte("祝你好运"),
+				Comment: "To the Cosmos! баллинг в космос",
+				Data:    []byte("祝你好运"),
 			},
 		},
 
 		1: {
-			in:	Transport{Vehicle: Plane{Name: "G6", MaxAltitude: 51e3}, Capacity: 18},
-			out:	new(Transport),
-			want:	&Transport{Vehicle: Plane{Name: "G6", MaxAltitude: 51e3}, Capacity: 18},
+			in:   Transport{Vehicle: Plane{Name: "G6", MaxAltitude: 51e3}, Capacity: 18},
+			out:  new(Transport),
+			want: &Transport{Vehicle: Plane{Name: "G6", MaxAltitude: 51e3}, Capacity: 18},
 		},
 	}
 
@@ -380,6 +381,7 @@ func TestJSONCodecRoundTrip(t *testing.T) {
 			continue
 		}
 
+		// Now check that the input is exactly equal to the output
 		uBlob, err := cdc.MarshalJSON(tt.out)
 		if err := cdc.UnmarshalJSON(mBlob, tt.out); err != nil {
 			t.Errorf("#%d: unexpected error after second MarshalJSON: %v", i, err)
@@ -404,31 +406,31 @@ func floatPtr(f float64) *float64 {
 
 type noFields struct{}
 type noExportedFields struct {
-	a	int
-	b	string
+	a int
+	b string
 }
 
 type oneExportedField struct {
-	_Foo	int
-	A	string
-	b	string
+	_Foo int
+	A    string
+	b    string
 }
 
 type aPointerField struct {
-	Foo	*int
-	Name	string	`json:"nm,omitempty"`
+	Foo  *int
+	Name string `json:"nm,omitempty"`
 }
 
 type doublyEmbedded struct {
-	Inner	*aPointerFieldAndEmbeddedField
-	Year	int64	`json:"year"`
+	Inner *aPointerFieldAndEmbeddedField
+	Year  int64 `json:"year"`
 }
 
 type aPointerFieldAndEmbeddedField struct {
-	Foo	*int
-	Name	string	`json:"nm,omitempty"`
+	Foo  *int
+	Name string `json:"nm,omitempty"`
 	*oneExportedField
-	B	*oneExportedField	`json:"bz,omitempty"`
+	B *oneExportedField `json:"bz,omitempty"`
 }
 
 type customJSONMarshaler int
@@ -440,13 +442,13 @@ func (cm customJSONMarshaler) MarshalJSON() ([]byte, error) {
 }
 
 type withCustomMarshaler struct {
-	F	customJSONMarshaler	`json:"fx"`
-	A	*aPointerField
+	F customJSONMarshaler `json:"fx"`
+	A *aPointerField
 }
 
 type Transport struct {
 	Vehicle
-	Capacity	int
+	Capacity int
 }
 
 type Vehicle interface {
@@ -468,69 +470,91 @@ type BalanceSheet struct {
 type Car string
 type Boat string
 type Plane struct {
-	Name		string
-	MaxAltitude	int64
+	Name        string
+	MaxAltitude int64
 }
 type insurancePlan int
 
-func (ip insurancePlan) Value() float64	{ return float64(ip) }
+func (ip insurancePlan) Value() float64 { return float64(ip) }
 
-func (c Car) Move() error	{ return nil }
-func (b Boat) Move() error	{ return nil }
-func (p Plane) Move() error	{ return nil }
+func (c Car) Move() error   { return nil }
+func (b Boat) Move() error  { return nil }
+func (p Plane) Move() error { return nil }
 
 func interfacePtr(v interface{}) *interface{} {
 	return &v
 }
 
+//----------------------------------------
+
 func TestMarshalJSONMap(t *testing.T) {
 	var cdc = amino.NewCodec()
 
 	type SimpleStruct struct {
-		Foo	int
-		Bar	[]byte
+		Foo int
+		Bar []byte
 	}
 
 	type MapsStruct struct {
-		Map1		map[string]string
-		Map1nil		map[string]string
-		Map1empty	map[string]string
+		Map1      map[string]string
+		Map1nil   map[string]string
+		Map1empty map[string]string
 
-		Map2		map[string]SimpleStruct
-		Map2nil		map[string]SimpleStruct
-		Map2empty	map[string]SimpleStruct
+		Map2      map[string]SimpleStruct
+		Map2nil   map[string]SimpleStruct
+		Map2empty map[string]SimpleStruct
 
-		Map3		map[string]*SimpleStruct
-		Map3nil		map[string]*SimpleStruct
-		Map3empty	map[string]*SimpleStruct
+		Map3      map[string]*SimpleStruct
+		Map3nil   map[string]*SimpleStruct
+		Map3empty map[string]*SimpleStruct
+
+		/*
+			NOT SUPPORTED YET.  FIRST, DEFINE SPEC.
+			Map4      map[int]*SimpleStruct
+			Map4nil   map[int]*SimpleStruct
+			Map4empty map[int]*SimpleStruct
+		*/
 	}
 
 	ms := MapsStruct{
-		Map1:		map[string]string{"foo": "bar"},
-		Map1nil:	(map[string]string)(nil),
-		Map1empty:	map[string]string{},
+		Map1:      map[string]string{"foo": "bar"},
+		Map1nil:   (map[string]string)(nil),
+		Map1empty: map[string]string{},
 
-		Map2:		map[string]SimpleStruct{"foo": {Foo: 1, Bar: []byte("bar")}},
-		Map2nil:	(map[string]SimpleStruct)(nil),
-		Map2empty:	map[string]SimpleStruct{},
+		Map2:      map[string]SimpleStruct{"foo": {Foo: 1, Bar: []byte("bar")}},
+		Map2nil:   (map[string]SimpleStruct)(nil),
+		Map2empty: map[string]SimpleStruct{},
 
-		Map3:		map[string]*SimpleStruct{"foo": &SimpleStruct{Foo: 1, Bar: []byte("bar")}},
-		Map3nil:	(map[string]*SimpleStruct)(nil),
-		Map3empty:	map[string]*SimpleStruct{},
+		Map3:      map[string]*SimpleStruct{"foo": &SimpleStruct{Foo: 1, Bar: []byte("bar")}},
+		Map3nil:   (map[string]*SimpleStruct)(nil),
+		Map3empty: map[string]*SimpleStruct{},
+
+		/*
+			Map4:      map[int]*SimpleStruct{123: &SimpleStruct{Foo: 1, Bar: []byte("bar")}},
+			Map4nil:   (map[int]*SimpleStruct)(nil),
+			Map4empty: map[int]*SimpleStruct{},
+		*/
 	}
 
+	// ms2 is expected to be this.
 	ms3 := MapsStruct{
-		Map1:		map[string]string{"foo": "bar"},
-		Map1nil:	map[string]string{},
-		Map1empty:	map[string]string{},
+		Map1:      map[string]string{"foo": "bar"},
+		Map1nil:   map[string]string{},
+		Map1empty: map[string]string{},
 
-		Map2:		map[string]SimpleStruct{"foo": {Foo: 1, Bar: []byte("bar")}},
-		Map2nil:	map[string]SimpleStruct{},
-		Map2empty:	map[string]SimpleStruct{},
+		Map2:      map[string]SimpleStruct{"foo": {Foo: 1, Bar: []byte("bar")}},
+		Map2nil:   map[string]SimpleStruct{},
+		Map2empty: map[string]SimpleStruct{},
 
-		Map3:		map[string]*SimpleStruct{"foo": &SimpleStruct{Foo: 1, Bar: []byte("bar")}},
-		Map3nil:	map[string]*SimpleStruct{},
-		Map3empty:	map[string]*SimpleStruct{},
+		Map3:      map[string]*SimpleStruct{"foo": &SimpleStruct{Foo: 1, Bar: []byte("bar")}},
+		Map3nil:   map[string]*SimpleStruct{},
+		Map3empty: map[string]*SimpleStruct{},
+
+		/*
+			Map4:      map[int]*SimpleStruct{123: &SimpleStruct{Foo: 1, Bar: []byte("bar")}},
+			Map4nil:   (map[int]*SimpleStruct)(nil),
+			Map4empty: map[int]*SimpleStruct{},
+		*/
 	}
 
 	b, err := cdc.MarshalJSON(ms)

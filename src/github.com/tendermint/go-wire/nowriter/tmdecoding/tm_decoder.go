@@ -2,6 +2,13 @@ package tmdecoding
 
 import "time"
 
+// Simplest pure interface for decoding and generally preferred.
+// return >0 bytesRead to indicate successful parse of one item.
+// return bytesRead = 0 to indicate not enough bytes read to parse yet.
+// return bytesRead = -1 to indicate enough bytes read to know of parse error.
+// if err is not nil, then bytesRead = -1
+// if bytesRead is not -1, then err is nil
+// if bytesRead is <= 0, the first return part uses the default constructor
 type TMDecoder interface {
 	DecodeBool([]byte) (b bool, bytesRead int, err error)
 	DecodeFloat32([]byte) (f float32, bytesRead int, err error)

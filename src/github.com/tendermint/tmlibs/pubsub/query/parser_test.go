@@ -7,10 +7,11 @@ import (
 	"github.com/tendermint/tmlibs/pubsub/query"
 )
 
+// TODO: fuzzy testing?
 func TestParser(t *testing.T) {
 	cases := []struct {
-		query	string
-		valid	bool
+		query string
+		valid bool
 	}{
 		{"tm.events.type='NewBlock'", true},
 		{"tm.events.type = 'NewBlock'", true},
@@ -53,7 +54,7 @@ func TestParser(t *testing.T) {
 		{"tx.date <= DATE -05-03", false},
 		{"tx.date >= DATE 20130503", false},
 		{"tx.date >= DATE 2013+01-03", false},
-
+		// incorrect year, month, day
 		{"tx.date >= DATE 0013-01-03", false},
 		{"tx.date >= DATE 2013-31-03", false},
 		{"tx.date >= DATE 2013-01-83", false},

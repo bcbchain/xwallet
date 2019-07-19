@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// Implementation of the TMEncoder interface.
 type TMEncoderPure struct {
 }
 
@@ -62,6 +63,7 @@ func (e TMEncoderPure) EncodeOctet(b byte) []byte {
 	return []byte{b}
 }
 
+// for orthogonality only
 func (e TMEncoderPure) EncodeOctets(b []byte) []byte {
 	arr := make([]byte, len(b))
 	copy(arr, b)

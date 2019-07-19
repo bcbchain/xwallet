@@ -6,6 +6,8 @@ import (
 	data "github.com/tendermint/go-wire/data"
 )
 
+/** These are some sample types to test parsing **/
+
 type Fooer interface {
 	Foo() string
 }
@@ -27,13 +29,15 @@ func (b Baz) Foo() string {
 }
 
 type Nested struct {
-	Prefix	string	`json:"prefix"`
-	Sub	FooerS	`json:"sub"`
+	Prefix string `json:"prefix"`
+	Sub    FooerS `json:"sub"`
 }
 
 func (n Nested) Foo() string {
 	return n.Prefix + ": " + n.Sub.Foo()
 }
+
+/** This is parse code: todo - autogenerate **/
 
 var fooersParser data.Mapper
 
@@ -53,10 +57,16 @@ func (f *FooerS) UnmarshalJSON(data []byte) (err error) {
 	return
 }
 
+// Set is a helper to deal with wrapped interfaces
 func (f *FooerS) Set(foo Fooer) {
 	f.Fooer = foo
 }
 
+/** end TO-BE auto-generated code **/
+
+/** This connects our code with the auto-generated helpers **/
+
+// this init must come after the above init (which should be in a file from import)
 func init() {
 	fooersParser = data.NewMapper(FooerS{}).
 		RegisterImplementation(Bar{}, "bar", 0x01).

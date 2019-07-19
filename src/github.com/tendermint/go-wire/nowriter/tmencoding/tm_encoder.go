@@ -2,6 +2,7 @@ package tmencoding
 
 import "time"
 
+// Simplest pure interface for encoding and generally preferred.
 type TMEncoder interface {
 	EncodeBool(b bool) []byte
 	EncodeFloat32(f float32) []byte

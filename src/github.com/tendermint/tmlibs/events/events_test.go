@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestAddListenerForEventFireOnce sets up an EventSwitch, subscribes a single
+// listener to an event, and sends a string "data".
 func TestAddListenerForEventFireOnce(t *testing.T) {
 	evsw := NewEventSwitch()
 	err := evsw.Start()
@@ -27,6 +29,8 @@ func TestAddListenerForEventFireOnce(t *testing.T) {
 	}
 }
 
+// TestAddListenerForEventFireMany sets up an EventSwitch, subscribes a single
+// listener to an event, and sends a thousand integers.
 func TestAddListenerForEventFireMany(t *testing.T) {
 	evsw := NewEventSwitch()
 	err := evsw.Start()
@@ -36,14 +40,14 @@ func TestAddListenerForEventFireMany(t *testing.T) {
 	doneSum := make(chan uint64)
 	doneSending := make(chan uint64)
 	numbers := make(chan uint64, 4)
-
+	// subscribe one listener for one event
 	evsw.AddListenerForEvent("listener", "event",
 		func(data EventData) {
 			numbers <- data.(uint64)
 		})
-
+	// collect received events
 	go sumReceivedNumbers(numbers, doneSum)
-
+	// go fire events
 	go fireEvents(evsw, "event", doneSending, uint64(1))
 	checkSum := <-doneSending
 	close(numbers)
@@ -53,6 +57,9 @@ func TestAddListenerForEventFireMany(t *testing.T) {
 	}
 }
 
+// TestAddListenerForDifferentEvents sets up an EventSwitch, subscribes a single
+// listener to three different events and sends a thousand integers for each
+// of the three events.
 func TestAddListenerForDifferentEvents(t *testing.T) {
 	evsw := NewEventSwitch()
 	err := evsw.Start()
@@ -64,7 +71,7 @@ func TestAddListenerForDifferentEvents(t *testing.T) {
 	doneSending2 := make(chan uint64)
 	doneSending3 := make(chan uint64)
 	numbers := make(chan uint64, 4)
-
+	// subscribe one listener to three events
 	evsw.AddListenerForEvent("listener", "event1",
 		func(data EventData) {
 			numbers <- data.(uint64)
@@ -77,9 +84,9 @@ func TestAddListenerForDifferentEvents(t *testing.T) {
 		func(data EventData) {
 			numbers <- data.(uint64)
 		})
-
+	// collect received events
 	go sumReceivedNumbers(numbers, doneSum)
-
+	// go fire events
 	go fireEvents(evsw, "event1", doneSending1, uint64(1))
 	go fireEvents(evsw, "event2", doneSending2, uint64(1))
 	go fireEvents(evsw, "event3", doneSending3, uint64(1))
@@ -94,6 +101,10 @@ func TestAddListenerForDifferentEvents(t *testing.T) {
 	}
 }
 
+// TestAddDifferentListenerForDifferentEvents sets up an EventSwitch,
+// subscribes a first listener to three events, and subscribes a second
+// listener to two of those three events, and then sends a thousand integers
+// for each of the three events.
 func TestAddDifferentListenerForDifferentEvents(t *testing.T) {
 	evsw := NewEventSwitch()
 	err := evsw.Start()
@@ -107,7 +118,7 @@ func TestAddDifferentListenerForDifferentEvents(t *testing.T) {
 	doneSending3 := make(chan uint64)
 	numbers1 := make(chan uint64, 4)
 	numbers2 := make(chan uint64, 4)
-
+	// subscribe two listener to three events
 	evsw.AddListenerForEvent("listener1", "event1",
 		func(data EventData) {
 			numbers1 <- data.(uint64)
@@ -128,11 +139,11 @@ func TestAddDifferentListenerForDifferentEvents(t *testing.T) {
 		func(data EventData) {
 			numbers2 <- data.(uint64)
 		})
-
+	// collect received events for listener1
 	go sumReceivedNumbers(numbers1, doneSum1)
-
+	// collect received events for listener2
 	go sumReceivedNumbers(numbers2, doneSum2)
-
+	// go fire events
 	go fireEvents(evsw, "event1", doneSending1, uint64(1))
 	go fireEvents(evsw, "event2", doneSending2, uint64(1001))
 	go fireEvents(evsw, "event3", doneSending3, uint64(2001))
@@ -151,6 +162,9 @@ func TestAddDifferentListenerForDifferentEvents(t *testing.T) {
 	}
 }
 
+// TestAddAndRemoveListener sets up an EventSwitch, subscribes a listener to
+// two events, fires a thousand integers for the first event, then unsubscribes
+// the listener and fires a thousand integers for the second event.
 func TestAddAndRemoveListener(t *testing.T) {
 	evsw := NewEventSwitch()
 	err := evsw.Start()
@@ -163,7 +177,7 @@ func TestAddAndRemoveListener(t *testing.T) {
 	doneSending2 := make(chan uint64)
 	numbers1 := make(chan uint64, 4)
 	numbers2 := make(chan uint64, 4)
-
+	// subscribe two listener to three events
 	evsw.AddListenerForEvent("listener", "event1",
 		func(data EventData) {
 			numbers1 <- data.(uint64)
@@ -172,14 +186,14 @@ func TestAddAndRemoveListener(t *testing.T) {
 		func(data EventData) {
 			numbers2 <- data.(uint64)
 		})
-
+	// collect received events for event1
 	go sumReceivedNumbers(numbers1, doneSum1)
-
+	// collect received events for event2
 	go sumReceivedNumbers(numbers2, doneSum2)
-
+	// go fire events
 	go fireEvents(evsw, "event1", doneSending1, uint64(1))
 	checkSumEvent1 := <-doneSending1
-
+	// after sending all event1, unsubscribe for all events
 	evsw.RemoveListener("listener")
 	go fireEvents(evsw, "event2", doneSending2, uint64(1001))
 	checkSumEvent2 := <-doneSending2
@@ -188,13 +202,14 @@ func TestAddAndRemoveListener(t *testing.T) {
 	eventSum1 := <-doneSum1
 	eventSum2 := <-doneSum2
 	if checkSumEvent1 != eventSum1 ||
-
+		// correct value asserted by preceding tests, suffices to be non-zero
 		checkSumEvent2 == uint64(0) ||
 		eventSum2 != uint64(0) {
 		t.Errorf("Not all messages sent were received or unsubscription did not register.\n")
 	}
 }
 
+// TestRemoveListener does basic tests on adding and removing
 func TestRemoveListener(t *testing.T) {
 	evsw := NewEventSwitch()
 	err := evsw.Start()
@@ -203,7 +218,7 @@ func TestRemoveListener(t *testing.T) {
 	}
 	count := 10
 	sum1, sum2 := 0, 0
-
+	// add some listeners and make sure they work
 	evsw.AddListenerForEvent("listener", "event1",
 		func(data EventData) {
 			sum1++
@@ -219,6 +234,7 @@ func TestRemoveListener(t *testing.T) {
 	assert.Equal(t, count, sum1)
 	assert.Equal(t, count, sum2)
 
+	// remove one by event and make sure it is gone
 	evsw.RemoveListenerForEvent("event2", "listener")
 	for i := 0; i < count; i++ {
 		evsw.FireEvent("event1", true)
@@ -227,6 +243,7 @@ func TestRemoveListener(t *testing.T) {
 	assert.Equal(t, count*2, sum1)
 	assert.Equal(t, count, sum2)
 
+	// remove the listener entirely and make sure both gone
 	evsw.RemoveListener("listener")
 	for i := 0; i < count; i++ {
 		evsw.FireEvent("event1", true)
@@ -236,6 +253,16 @@ func TestRemoveListener(t *testing.T) {
 	assert.Equal(t, count, sum2)
 }
 
+// TestAddAndRemoveListenersAsync sets up an EventSwitch, subscribes two
+// listeners to three events, and fires a thousand integers for each event.
+// These two listeners serve as the baseline validation while other listeners
+// are randomly subscribed and unsubscribed.
+// More precisely it randomly subscribes new listeners (different from the first
+// two listeners) to one of these three events. At the same time it starts
+// randomly unsubscribing these additional listeners from all events they are
+// at that point subscribed to.
+// NOTE: it is important to run this test with race conditions tracking on,
+// `go test -race`, to examine for possible race conditions.
 func TestRemoveListenersAsync(t *testing.T) {
 	evsw := NewEventSwitch()
 	err := evsw.Start()
@@ -249,7 +276,7 @@ func TestRemoveListenersAsync(t *testing.T) {
 	doneSending3 := make(chan uint64)
 	numbers1 := make(chan uint64, 4)
 	numbers2 := make(chan uint64, 4)
-
+	// subscribe two listener to three events
 	evsw.AddListenerForEvent("listener1", "event1",
 		func(data EventData) {
 			numbers1 <- data.(uint64)
@@ -274,9 +301,9 @@ func TestRemoveListenersAsync(t *testing.T) {
 		func(data EventData) {
 			numbers2 <- data.(uint64)
 		})
-
+	// collect received events for event1
 	go sumReceivedNumbers(numbers1, doneSum1)
-
+	// collect received events for event2
 	go sumReceivedNumbers(numbers2, doneSum2)
 	addListenersStress := func() {
 		s1 := rand.NewSource(time.Now().UnixNano())
@@ -298,7 +325,7 @@ func TestRemoveListenersAsync(t *testing.T) {
 		}
 	}
 	addListenersStress()
-
+	// go fire events
 	go fireEvents(evsw, "event1", doneSending1, uint64(1))
 	removeListenersStress()
 	go fireEvents(evsw, "event2", doneSending2, uint64(1001))
@@ -317,6 +344,12 @@ func TestRemoveListenersAsync(t *testing.T) {
 	}
 }
 
+//------------------------------------------------------------------------------
+// Helper functions
+
+// sumReceivedNumbers takes two channels and adds all numbers received
+// until the receiving channel `numbers` is closed; it then sends the sum
+// on `doneSum` and closes that channel.  Expected to be run in a go-routine.
 func sumReceivedNumbers(numbers, doneSum chan uint64) {
 	var sum uint64 = 0
 	for {
@@ -330,6 +363,11 @@ func sumReceivedNumbers(numbers, doneSum chan uint64) {
 	}
 }
 
+// fireEvents takes an EventSwitch and fires a thousand integers under
+// a given `event` with the integers mootonically increasing from `offset`
+// to `offset` + 999.  It additionally returns the addition of all integers
+// sent on `doneChan` for assertion that all events have been sent, and enabling
+// the test to assert all events have also been received.
 func fireEvents(evsw EventSwitch, event string, doneChan chan uint64,
 	offset uint64) {
 	var sentSum uint64 = 0

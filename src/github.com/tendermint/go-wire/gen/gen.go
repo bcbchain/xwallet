@@ -33,7 +33,7 @@ func (sw *WrapperWriter) Write(w io.Writer, t typewriter.Type) error {
 	tag, found := t.FindTag(sw)
 
 	if !found {
-
+		// nothing to be done
 		return nil
 	}
 
@@ -47,12 +47,14 @@ func (sw *WrapperWriter) Write(w io.Writer, t typewriter.Type) error {
 		return err
 	}
 
+	// prepare parameters
 	name := t.Name + "Wrapper"
 	if len(tag.Values) > 0 {
 		name = tag.Values[0].Name
 	}
 	m := model{Type: t, Wrapper: name, Inner: t.Name}
 
+	// now, first main Wrapper
 	v := typewriter.TagValue{Name: "Wrapper"}
 	htmpl, err := templates.ByTagValue(t, v)
 	if err != nil {
@@ -62,6 +64,7 @@ func (sw *WrapperWriter) Write(w io.Writer, t typewriter.Type) error {
 		return err
 	}
 
+	// Now, add any implementations...
 	v.Name = "Register"
 	rtmpl, err := templates.ByTagValue(t, v)
 	if err != nil {
@@ -90,10 +93,10 @@ func (sw *WrapperWriter) Write(w io.Writer, t typewriter.Type) error {
 }
 
 type model struct {
-	Type		typewriter.Type
-	Wrapper		string
-	Inner		string
-	Impl		typewriter.Type
-	ImplType	string
-	Count		int
+	Type     typewriter.Type
+	Wrapper  string
+	Inner    string
+	Impl     typewriter.Type // fill in when adding for implementations
+	ImplType string
+	Count    int
 }

@@ -12,6 +12,7 @@ func TestSimpleArmor(t *testing.T) {
 	data := []byte("somedata")
 	armorStr := EncodeArmor(blockType, nil, data)
 
+	// Decode armorStr and test for equivalence.
 	blockType2, _, data2, err := DecodeArmor(armorStr)
 	require.Nil(t, err, "%+v", err)
 	assert.Equal(t, blockType, blockType2)

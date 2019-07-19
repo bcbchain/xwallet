@@ -10,15 +10,15 @@ import (
 
 func newConsensusParams(blockSize, partSize int) ConsensusParams {
 	return ConsensusParams{
-		BlockSize:	BlockSize{MaxBytes: blockSize},
-		BlockGossip:	BlockGossip{BlockPartSizeBytes: partSize},
+		BlockSize:   BlockSize{MaxBytes: blockSize},
+		BlockGossip: BlockGossip{BlockPartSizeBytes: partSize},
 	}
 }
 
 func TestConsensusParamsValidation(t *testing.T) {
 	testCases := []struct {
-		params	ConsensusParams
-		valid	bool
+		params ConsensusParams
+		valid  bool
 	}{
 		{newConsensusParams(1, 1), true},
 		{newConsensusParams(1, 0), false},
@@ -46,13 +46,13 @@ func makeParams(blockBytes, blockTx, blockGas, txBytes,
 
 	return ConsensusParams{
 		BlockSize: BlockSize{
-			MaxBytes:	blockBytes,
-			MaxTxs:		blockTx,
-			MaxGas:		int64(blockGas),
+			MaxBytes: blockBytes,
+			MaxTxs:   blockTx,
+			MaxGas:   int64(blockGas),
 		},
 		TxSize: TxSize{
-			MaxBytes:	txBytes,
-			MaxGas:		int64(txGas),
+			MaxBytes: txBytes,
+			MaxGas:   int64(txGas),
 		},
 		BlockGossip: BlockGossip{
 			BlockPartSizeBytes: partSize,
@@ -77,6 +77,8 @@ func TestConsensusParamsHash(t *testing.T) {
 		hashes[i] = params[i].Hash()
 	}
 
+	// make sure there are no duplicates...
+	// sort, then check in order for matches
 	sort.Slice(hashes, func(i, j int) bool {
 		return bytes.Compare(hashes[i], hashes[j]) < 0
 	})

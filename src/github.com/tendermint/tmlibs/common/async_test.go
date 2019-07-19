@@ -12,6 +12,7 @@ import (
 
 func TestParallel(t *testing.T) {
 
+	// Create tasks.
 	var counter = new(int32)
 	var tasks = make([]Task, 100*1000)
 	for i := 0; i < len(tasks); i++ {
@@ -21,9 +22,11 @@ func TestParallel(t *testing.T) {
 		}
 	}
 
+	// Run in parallel.
 	var trs, ok = Parallel(tasks...)
 	assert.True(t, ok)
 
+	// Verify.
 	assert.Equal(t, int(*counter), len(tasks), "Each task should have incremented the counter already")
 	var failedTasks int
 	for i := 0; i < len(tasks); i++ {
@@ -38,7 +41,7 @@ func TestParallel(t *testing.T) {
 			assert.Fail(t, "Task should have returned %v but got %v", -1*i, taskResult.Value.(int))
 			failedTasks++
 		} else {
-
+			// Good!
 		}
 	}
 	assert.Equal(t, failedTasks, 0, "No task should have failed")
@@ -50,9 +53,10 @@ func TestParallelAbort(t *testing.T) {
 
 	var flow1 = make(chan struct{}, 1)
 	var flow2 = make(chan struct{}, 1)
-	var flow3 = make(chan struct{}, 1)
+	var flow3 = make(chan struct{}, 1) // Cap must be > 0 to prevent blocking.
 	var flow4 = make(chan struct{}, 1)
 
+	// Create tasks.
 	var tasks = []Task{
 		func(i int) (res interface{}, err error, abort bool) {
 			assert.Equal(t, i, 0)
@@ -76,15 +80,21 @@ func TestParallelAbort(t *testing.T) {
 		},
 	}
 
+	// Run in parallel.
 	var taskResultSet, ok = Parallel(tasks...)
 	assert.False(t, ok, "ok should be false since we aborted task #2.")
 
+	// Verify task #3.
+	// Initially taskResultSet.chz[3] sends nothing since flow4 didn't send.
 	waitTimeout(t, taskResultSet.chz[3], "Task #3")
 
+	// Now let the last task (#3) complete after abort.
 	flow4 <- <-flow3
 
+	// Wait until all tasks have returned or panic'd.
 	taskResultSet.Wait()
 
+	// Verify task #0, #1, #2.
 	checkResult(t, taskResultSet, 0, 0, nil, nil)
 	checkResult(t, taskResultSet, 1, 1, errors.New("some error"), nil)
 	checkResult(t, taskResultSet, 2, 2, nil, nil)
@@ -93,6 +103,7 @@ func TestParallelAbort(t *testing.T) {
 
 func TestParallelRecover(t *testing.T) {
 
+	// Create tasks.
 	var tasks = []Task{
 		func(i int) (res interface{}, err error, abort bool) {
 			return 0, nil, false
@@ -105,14 +116,17 @@ func TestParallelRecover(t *testing.T) {
 		},
 	}
 
+	// Run in parallel.
 	var taskResultSet, ok = Parallel(tasks...)
 	assert.False(t, ok, "ok should be false since we panic'd in task #2.")
 
+	// Verify task #0, #1, #2.
 	checkResult(t, taskResultSet, 0, 0, nil, nil)
 	checkResult(t, taskResultSet, 1, 1, errors.New("some error"), nil)
 	checkResult(t, taskResultSet, 2, nil, nil, 2)
 }
 
+// Wait for result
 func checkResult(t *testing.T, taskResultSet *TaskResultSet, index int, val interface{}, err error, pnk interface{}) {
 	taskResult, ok := taskResultSet.LatestResult(index)
 	taskName := fmt.Sprintf("Task #%v", index)
@@ -127,6 +141,7 @@ func checkResult(t *testing.T, taskResultSet *TaskResultSet, index int, val inte
 	}
 }
 
+// Wait for timeout (no result)
 func waitTimeout(t *testing.T, taskResultCh TaskResultCh, taskName string) {
 	select {
 	case _, ok := <-taskResultCh:
@@ -135,7 +150,7 @@ func waitTimeout(t *testing.T, taskResultCh TaskResultCh, taskName string) {
 		} else {
 			assert.Fail(t, "TaskResultCh unexpectedly returned for %v", taskName)
 		}
-	case <-time.After(1 * time.Second):
-
+	case <-time.After(1 * time.Second): // TODO use deterministic time?
+		// Good!
 	}
 }

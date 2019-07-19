@@ -13,7 +13,7 @@ func init() {
 }
 
 var sighupWatchers *SighupWatcher
-var sighupCounter int32
+var sighupCounter int32 // For testing
 
 func initSighupWatcher() {
 	sighupWatchers = newSighupWatcher()
@@ -29,9 +29,10 @@ func initSighupWatcher() {
 	}()
 }
 
+// Watchces for SIGHUP events and notifies registered AutoFiles
 type SighupWatcher struct {
-	mtx		sync.Mutex
-	autoFiles	map[string]*AutoFile
+	mtx       sync.Mutex
+	autoFiles map[string]*AutoFile
 }
 
 func newSighupWatcher() *SighupWatcher {
@@ -46,6 +47,7 @@ func (w *SighupWatcher) addAutoFile(af *AutoFile) {
 	w.mtx.Unlock()
 }
 
+// If AutoFile isn't registered or was already removed, does nothing.
 func (w *SighupWatcher) removeAutoFile(af *AutoFile) {
 	w.mtx.Lock()
 	delete(w.autoFiles, af.ID)

@@ -11,6 +11,7 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+// Start the grpcServer in a go routine
 func StartGRPCServer(protoAddr string) (net.Listener, error) {
 	parts := strings.SplitN(protoAddr, "://", 2)
 	if len(parts) != 2 {
@@ -24,11 +25,12 @@ func StartGRPCServer(protoAddr string) (net.Listener, error) {
 
 	grpcServer := grpc.NewServer()
 	RegisterBroadcastAPIServer(grpcServer, &broadcastAPI{})
-	go grpcServer.Serve(ln)
+	go grpcServer.Serve(ln) // nolint: errcheck
 
 	return ln, nil
 }
 
+// Start the client by dialing the server
 func StartGRPCClient(protoAddr string) BroadcastAPIClient {
 	conn, err := grpc.Dial(protoAddr, grpc.WithInsecure(), grpc.WithDialer(dialerFunc))
 	if err != nil {

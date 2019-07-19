@@ -8,11 +8,13 @@ import (
 	"time"
 )
 
+// Implementation of the legacy (`TMEncoderFastIOWriter`) interface
 type TMEncoderLegacy struct {
 }
 
-var Legacy *TMEncoderLegacy = &TMEncoderLegacy{}
+var Legacy *TMEncoderLegacy = &TMEncoderLegacy{} // convenience
 
+// Does not use builder pattern to encourage migration away from this struct
 func (e *TMEncoderLegacy) WriteBool(b bool, w io.Writer, n *int, err *error) {
 	var bb byte
 	if b {
@@ -115,7 +117,7 @@ func (e *TMEncoderLegacy) WriteVarint(i int, w io.Writer, n *int, err *error) {
 	}
 	var size = uvarintSize(uint64(i))
 	if negate {
-
+		// e.g. 0xF1 for a single negative byte
 		e.WriteUint8(uint8(size+0xF0), w, n, err)
 	} else {
 		e.WriteUint8(uint8(size), w, n, err)
@@ -127,6 +129,8 @@ func (e *TMEncoderLegacy) WriteVarint(i int, w io.Writer, n *int, err *error) {
 	}
 }
 
+// Write all of bz to w
+// Increment n and set err accordingly.
 func (e *TMEncoderLegacy) WriteTo(bz []byte, w io.Writer, n *int, err *error) {
 	if *err != nil {
 		return

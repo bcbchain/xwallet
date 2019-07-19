@@ -8,9 +8,10 @@ import (
 )
 
 func TestListener(t *testing.T) {
+	// Create a listener
+	l := NewDefaultListener("tcp", ":8001", "", true, log.TestingLogger())
 
-	l := NewDefaultListener("tcp", ":8001", true, log.TestingLogger())
-
+	// Dial the listener
 	lAddr := l.ExternalAddress()
 	connOut, err := lAddr.Dial()
 	if err != nil {
@@ -41,5 +42,6 @@ func TestListener(t *testing.T) {
 		t.Fatalf("Got %s, expected %s", b, msg)
 	}
 
+	// Close the server, no longer needed.
 	l.Stop()
 }

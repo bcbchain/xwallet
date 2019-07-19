@@ -17,10 +17,12 @@ func TestInt16(t *testing.T) {
 	}
 }
 
+// Returns true of overflow or underflow
 func checkIntSpill(i int64) bool {
 	return i == (int64)((int)(i))
 }
 
+// Returns true of overflow or underflow
 func checkUintSpill(i uint64) bool {
 	return i == (uint64)((uint)(i))
 }
@@ -29,12 +31,12 @@ func TestVarint(t *testing.T) {
 
 	check := func(i64 int64, s string) {
 		i := int(i64)
-
+		// Test with WriteVarint
 		{
 			buf := new(bytes.Buffer)
 			n, err := new(int), new(error)
 			WriteVarint(i, buf, n, err)
-			bufBytes := buf.Bytes()
+			bufBytes := buf.Bytes() // Read before consuming below.
 			i_ := ReadVarint(buf, n, err)
 			if i != i_ {
 				fmt.Println(bufBytes)
@@ -46,7 +48,7 @@ func TestVarint(t *testing.T) {
 				}
 			}
 		}
-
+		// Test with PutVarint
 		{
 			buf := make([]byte, 100, 100)
 			n1, err := PutVarint(buf, i)
@@ -80,6 +82,7 @@ func TestVarint(t *testing.T) {
 		}
 	}
 
+	// 123457 is some prime.
 	var i int64
 	for i = -(2 << 33); i < (2 << 33); i += 123457 {
 		if !arch64 && checkIntSpill(i) {
@@ -88,10 +91,11 @@ func TestVarint(t *testing.T) {
 		check(i, "")
 	}
 
+	// Near zero
 	check(-1, "F101")
 	check(0, "00")
 	check(1, "0101")
-
+	// Positives
 	check(1<<31-1, "047FFFFFFF")
 	if arch64 {
 		check(1<<32-1, "04FFFFFFFF")
@@ -100,7 +104,7 @@ func TestVarint(t *testing.T) {
 		check(1<<53-1, "071FFFFFFFFFFFFF")
 		check(1<<63-1, "087FFFFFFFFFFFFFFF")
 	}
-
+	// Negatives
 	check(-1<<31+1, "F47FFFFFFF")
 	if arch64 {
 		check(-1<<32+1, "F4FFFFFFFF")
@@ -116,7 +120,7 @@ func TestUvarint(t *testing.T) {
 
 	check := func(i64 uint64, s string) {
 		i := uint(i64)
-
+		// Test with WriteUvarint
 		{
 			buf := new(bytes.Buffer)
 			n, err := new(int), new(error)
@@ -133,7 +137,7 @@ func TestUvarint(t *testing.T) {
 				}
 			}
 		}
-
+		// Test with PutUvarint
 		{
 			buf := make([]byte, 100, 100)
 			n1, err := PutUvarint(buf, i)
@@ -167,6 +171,7 @@ func TestUvarint(t *testing.T) {
 		}
 	}
 
+	// 123457 is some prime.
 	var i uint64
 	for i = 0; i < (2 << 33); i += 123457 {
 		if !arch64 && checkUintSpill(i) {

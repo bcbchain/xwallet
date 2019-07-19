@@ -5,8 +5,8 @@ import "fmt"
 type CryptoAlgo string
 
 const (
-	AlgoEd25519	= CryptoAlgo("ed25519")
-	AlgoSecp256k1	= CryptoAlgo("secp256k1")
+	AlgoEd25519   = CryptoAlgo("ed25519")
+	AlgoSecp256k1 = CryptoAlgo("secp256k1")
 )
 
 func cryptoAlgoToByte(key CryptoAlgo) byte {

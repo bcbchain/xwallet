@@ -6,6 +6,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+// NewTracingLogger enables tracing by wrapping all errors (if they
+// implement stackTracer interface) in tracedError.
+//
+// All errors returned by https://github.com/pkg/errors implement stackTracer
+// interface.
+//
+// For debugging purposes only as it doubles the amount of allocations.
 func NewTracingLogger(next Logger) Logger {
 	return &tracingLogger{
 		next: next,
@@ -49,6 +56,8 @@ func (l *tracingLogger) With(keyvals ...interface{}) Logger {
 	return &tracingLogger{next: l.next.With(formatErrors(keyvals)...)}
 }
 
+func (l *tracingLogger) Flush() {}
+
 func formatErrors(keyvals []interface{}) []interface{} {
 	newKeyvals := make([]interface{}, len(keyvals))
 	copy(newKeyvals, keyvals)
@@ -60,6 +69,8 @@ func formatErrors(keyvals []interface{}) []interface{} {
 	return newKeyvals
 }
 
+// tracedError wraps a stackTracer and just makes the Error() result
+// always return a full stack trace.
 type tracedError struct {
 	wrapped stackTracer
 }

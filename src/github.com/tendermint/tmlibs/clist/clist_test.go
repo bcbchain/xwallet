@@ -18,9 +18,21 @@ func TestSmall(t *testing.T) {
 		t.Error("Expected len 3, got ", l.Len())
 	}
 
+	//fmt.Printf("%p %v\n", el1, el1)
+	//fmt.Printf("%p %v\n", el2, el2)
+	//fmt.Printf("%p %v\n", el3, el3)
+
 	r1 := l.Remove(el1)
 
+	//fmt.Printf("%p %v\n", el1, el1)
+	//fmt.Printf("%p %v\n", el2, el2)
+	//fmt.Printf("%p %v\n", el3, el3)
+
 	r2 := l.Remove(el2)
+
+	//fmt.Printf("%p %v\n", el1, el1)
+	//fmt.Printf("%p %v\n", el2, el2)
+	//fmt.Printf("%p %v\n", el3, el3)
 
 	r3 := l.Remove(el3)
 
@@ -39,12 +51,20 @@ func TestSmall(t *testing.T) {
 
 }
 
+/*
+This test is quite hacky because it relies on SetFinalizer
+which isn't guaranteed to run at all.
+*/
+// nolint: megacheck
 func _TestGCFifo(t *testing.T) {
 
 	const numElements = 1000000
 	l := New()
 	gcCount := new(uint64)
 
+	// SetFinalizer doesn't work well with circular structures,
+	// so we construct a trivial non-circular structure to
+	// track.
 	type value struct {
 		Int int
 	}
@@ -61,9 +81,10 @@ func _TestGCFifo(t *testing.T) {
 
 	for el := l.Front(); el != nil; {
 		l.Remove(el)
-
+		//oldEl := el
 		el = el.Next()
-
+		//oldEl.DetachPrev()
+		//oldEl.DetachNext()
 	}
 
 	runtime.GC()
@@ -78,12 +99,20 @@ func _TestGCFifo(t *testing.T) {
 	}
 }
 
+/*
+This test is quite hacky because it relies on SetFinalizer
+which isn't guaranteed to run at all.
+*/
+// nolint: megacheck
 func _TestGCRandom(t *testing.T) {
 
 	const numElements = 1000000
 	l := New()
 	gcCount := 0
 
+	// SetFinalizer doesn't work well with circular structures,
+	// so we construct a trivial non-circular structure to
+	// track.
 	type value struct {
 		Int int
 	}
@@ -132,6 +161,7 @@ func TestScanRightDeleteRandom(t *testing.T) {
 		els[i] = el
 	}
 
+	// Launch scanner routines that will rapidly iterate over elements.
 	for i := 0; i < numScanners; i++ {
 		go func(scannerID int) {
 			var el *CElement
@@ -156,13 +186,17 @@ func TestScanRightDeleteRandom(t *testing.T) {
 		}(i)
 	}
 
+	// Remove an element, push back an element.
 	for i := 0; i < numTimes; i++ {
-
+		// Pick an element to remove
 		rmElIdx := rand.Intn(len(els))
 		rmEl := els[rmElIdx]
 
+		// Remove it
 		l.Remove(rmEl)
+		//fmt.Print(".")
 
+		// Insert a new element
 		newEl := l.PushBack(-1*i - 1)
 		els[rmElIdx] = newEl
 
@@ -172,9 +206,11 @@ func TestScanRightDeleteRandom(t *testing.T) {
 
 	}
 
+	// Stop scanners
 	close(stop)
 	time.Sleep(time.Second * 1)
 
+	// And remove all the elements.
 	for el := l.Front(); el != nil; el = el.Next() {
 		l.Remove(el)
 	}
@@ -187,15 +223,18 @@ func TestWaitChan(t *testing.T) {
 	l := New()
 	ch := l.WaitChan()
 
+	// 1) add one element to an empty list
 	go l.PushBack(1)
 	<-ch
 
+	// 2) and remove it
 	el := l.Front()
 	v := l.Remove(el)
 	if v != 1 {
 		t.Fatal("where is 1 coming from?")
 	}
 
+	// 3) test iterating forward and waiting for Next (NextWaitChan and Next)
 	el = l.PushBack(0)
 
 	done := make(chan struct{})
@@ -231,6 +270,7 @@ FOR_LOOP:
 		t.Fatalf("number of pushed items (%d) not equal to number of seen items (%d)", pushed, seen)
 	}
 
+	// 4) test iterating backwards (PrevWaitChan and Prev)
 	prev := next
 	seen = 0
 FOR_LOOP2:

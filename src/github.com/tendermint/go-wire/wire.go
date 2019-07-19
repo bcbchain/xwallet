@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	ErrBinaryReadOverflow			= errors.New("Error: binary read overflow")
-	ErrBinaryReadInvalidLength		= errors.New("Error: binary read invalid length")
-	ErrBinaryReadInvalidTimeNegative	= errors.New("Error: binary read invalid time - negative")
-	ErrBinaryReadInvalidTimeSubMillisecond	= errors.New("Error: binary read invalid time - sub millisecond")
-	ErrBinaryWriteOverflow			= errors.New("Error: binary write overflow")
+	ErrBinaryReadOverflow                  = errors.New("Error: binary read overflow")
+	ErrBinaryReadInvalidLength             = errors.New("Error: binary read invalid length")
+	ErrBinaryReadInvalidTimeNegative       = errors.New("Error: binary read invalid time - negative")
+	ErrBinaryReadInvalidTimeSubMillisecond = errors.New("Error: binary read invalid time - sub millisecond")
+	ErrBinaryWriteOverflow                 = errors.New("Error: binary write overflow")
 )
 
 const (
@@ -26,7 +26,8 @@ func ReadBinary(o interface{}, r io.Reader, lmt int, n *int, err *error) (res in
 	rv, rt := reflect.ValueOf(o), reflect.TypeOf(o)
 	if rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
-
+			// This allows ReadBinary() to return a nil pointer,
+			// if the value read is nil.
 			rvPtr := reflect.New(rt)
 			ReadBinaryPtr(rvPtr.Interface(), r, lmt, n, err)
 			res = rvPtr.Elem().Interface()
@@ -70,6 +71,9 @@ func ReadBinaryPtrLengthPrefixed(o interface{}, r io.Reader, lmt int, n *int, er
 	return res
 }
 
+// WriteBinary is the binary encoder. Its arguments are the subject to be
+// encoded, the writer that'll receive the encoded bytes, as well as a
+// receiver to store the bytes written and any error encountered.
 func WriteBinary(o interface{}, w io.Writer, n *int, err *error) {
 	rv := reflect.ValueOf(o)
 	rt := reflect.TypeOf(o)
@@ -104,11 +108,13 @@ func ReadJSONPtr(o interface{}, bytes []byte, err *error) interface{} {
 	return ReadJSONObjectPtr(o, object, err)
 }
 
+// o is the ultimate destination, object is the result of json unmarshal
 func ReadJSONObject(o interface{}, object interface{}, err *error) interface{} {
 	rv, rt := reflect.ValueOf(o), reflect.TypeOf(o)
 	if rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
-
+			// This allows ReadJSONObject() to return a nil pointer
+			// if the value read is nil.
 			rvPtr := reflect.New(rt)
 			ReadJSONObjectPtr(rvPtr.Interface(), object, err)
 			return rvPtr.Elem().Interface()
@@ -142,6 +148,8 @@ func WriteJSON(o interface{}, w io.Writer, n *int, err *error) {
 	writeReflectJSON(rv, rt, Options{}, w, n, err)
 }
 
+// Write all of bz to w
+// Increment n and set err accordingly.
 func WriteTo(bz []byte, w io.Writer, n *int, err *error) {
 	if *err != nil {
 		return
@@ -151,6 +159,8 @@ func WriteTo(bz []byte, w io.Writer, n *int, err *error) {
 	*err = err_
 }
 
+// Read len(buf) from r
+// Increment n and set err accordingly.
 func ReadFull(buf []byte, r io.Reader, n *int, err *error) {
 	if *err != nil {
 		return

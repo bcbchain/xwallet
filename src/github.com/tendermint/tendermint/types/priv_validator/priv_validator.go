@@ -13,11 +13,12 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+// TODO: type ?
 const (
-	stepNone	int8	= 0
-	stepPropose	int8	= 1
-	stepPrevote	int8	= 2
-	stepPrecommit	int8	= 3
+	stepNone      int8 = 0 // Used to distinguish the initial state
+	stepPropose   int8 = 1
+	stepPrevote   int8 = 2
+	stepPrecommit int8 = 3
 )
 
 func voteToStep(vote *types.Vote) int8 {
@@ -32,39 +33,53 @@ func voteToStep(vote *types.Vote) int8 {
 	}
 }
 
+// FilePV implements PrivValidator using data persisted to disk
+// to prevent double signing.
+// NOTE: the directory containing the pv.filePath must already exist.
 type FilePV struct {
-	Address		crypto.Address		`json:"address"`
-	PubKey		crypto.PubKey		`json:"pub_key"`
-	LastHeight	int64			`json:"last_height"`
-	LastRound	int			`json:"last_round"`
-	LastStep	int8			`json:"last_step"`
-	LastSignature	crypto.Signature	`json:"last_signature,omitempty"`
-	LastSignBytes	cmn.HexBytes		`json:"last_signbytes,omitempty"`
-	PrivKey		crypto.PrivKey		`json:"priv_key"`
+	Address       crypto.Address   `json:"address"`
+	PubKey        crypto.PubKey    `json:"pub_key"`
+	LastHeight    int64            `json:"last_height"`
+	LastRound     int              `json:"last_round"`
+	LastStep      int8             `json:"last_step"`
+	LastSignature crypto.Signature `json:"last_signature,omitempty"` // so we dont lose signatures XXX Why would we lose signatures?
+	LastSignBytes cmn.HexBytes     `json:"last_signbytes,omitempty"` // so we dont lose signatures XXX Why would we lose signatures?
+	PrivKey       crypto.PrivKey   `json:"priv_key"`
 
-	filePath	string
-	mtx		sync.Mutex
+	// For persistence.
+	// Overloaded for testing.
+	filePath string
+	mtx      sync.Mutex
 }
 
+// GetAddress returns the address of the validator.
+// Implements PrivValidator.
 func (pv *FilePV) GetAddress() crypto.Address {
 	return pv.Address
 }
 
+// GetPubKey returns the public key of the validator.
+// Implements PrivValidator.
 func (pv *FilePV) GetPubKey() crypto.PubKey {
 	return pv.PubKey
 }
 
+// GenFilePV generates a new validator with randomly generated private key
+// and sets the filePath, but does not call Save().
 func GenFilePV(filePath string) *FilePV {
 	privKey := crypto.GenPrivKeyEd25519()
 	return &FilePV{
-		Address:	privKey.PubKey().Address(),
-		PubKey:		privKey.PubKey(),
-		PrivKey:	privKey,
-		LastStep:	stepNone,
-		filePath:	filePath,
+		Address:  privKey.PubKey().Address(crypto.GetChainId()),
+		PubKey:   privKey.PubKey(),
+		PrivKey:  privKey,
+		LastStep: stepNone,
+		filePath: filePath,
 	}
 }
 
+// LoadFilePV loads a FilePV from the filePath.  The FilePV handles double
+// signing prevention by persisting data to the filePath.  If the filePath does
+// not exist, the FilePV must be created manually and saved.
 func LoadFilePV(filePath string) *FilePV {
 	pvJSONBytes, err := ioutil.ReadFile(filePath)
 	if err != nil {
@@ -80,6 +95,8 @@ func LoadFilePV(filePath string) *FilePV {
 	return pv
 }
 
+// LoadOrGenFilePV loads a FilePV from the given filePath
+// or else generates a new one and saves it to the filePath.
 func LoadOrGenFilePV(filePath string) *FilePV {
 	var pv *FilePV
 	if cmn.FileExists(filePath) {
@@ -91,6 +108,7 @@ func LoadOrGenFilePV(filePath string) *FilePV {
 	return pv
 }
 
+// Save persists the FilePV to disk.
 func (pv *FilePV) Save() {
 	pv.mtx.Lock()
 	defer pv.mtx.Unlock()
@@ -112,6 +130,8 @@ func (pv *FilePV) save() {
 	}
 }
 
+// Reset resets all fields in the FilePV.
+// NOTE: Unsafe!
 func (pv *FilePV) Reset() {
 	var sig crypto.Signature
 	pv.LastHeight = 0
@@ -122,6 +142,8 @@ func (pv *FilePV) Reset() {
 	pv.Save()
 }
 
+// SignVote signs a canonical representation of the vote, along with the
+// chainID. Implements PrivValidator.
 func (pv *FilePV) SignVote(chainID string, vote *types.Vote) error {
 	pv.mtx.Lock()
 	defer pv.mtx.Unlock()
@@ -131,6 +153,8 @@ func (pv *FilePV) SignVote(chainID string, vote *types.Vote) error {
 	return nil
 }
 
+// SignProposal signs a canonical representation of the proposal, along with
+// the chainID. Implements PrivValidator.
 func (pv *FilePV) SignProposal(chainID string, proposal *types.Proposal) error {
 	pv.mtx.Lock()
 	defer pv.mtx.Unlock()
@@ -140,6 +164,7 @@ func (pv *FilePV) SignProposal(chainID string, proposal *types.Proposal) error {
 	return nil
 }
 
+// returns error if HRS regression or no LastSignBytes. returns true if HRS is unchanged
 func (pv *FilePV) checkHRS(height int64, round int, step int8) (bool, error) {
 	if pv.LastHeight > height {
 		return false, errors.New("Height regression")
@@ -167,6 +192,9 @@ func (pv *FilePV) checkHRS(height int64, round int, step int8) (bool, error) {
 	return false, nil
 }
 
+// signVote checks if the vote is good to sign and sets the vote signature.
+// It may need to set the timestamp as well if the vote is otherwise the same as
+// a previously signed vote (ie. we crashed after signing but before the vote hit the WAL).
 func (pv *FilePV) signVote(chainID string, vote *types.Vote) error {
 	height, round, step := vote.Height, vote.Round, voteToStep(vote)
 	signBytes := vote.SignBytes(chainID)
@@ -176,6 +204,11 @@ func (pv *FilePV) signVote(chainID string, vote *types.Vote) error {
 		return err
 	}
 
+	// We might crash before writing to the wal,
+	// causing us to try to re-sign for the same HRS.
+	// If signbytes are the same, use the last signature.
+	// If they only differ by timestamp, use last timestamp and signature
+	// Otherwise, return error
 	if sameHRS {
 		if bytes.Equal(signBytes, pv.LastSignBytes) {
 			vote.Signature = pv.LastSignature
@@ -188,12 +221,16 @@ func (pv *FilePV) signVote(chainID string, vote *types.Vote) error {
 		return err
 	}
 
+	// It passed the checks. Sign the vote
 	sig := pv.PrivKey.Sign(signBytes)
 	pv.saveSigned(height, round, step, signBytes, sig)
 	vote.Signature = sig
 	return nil
 }
 
+// signProposal checks if the proposal is good to sign and sets the proposal signature.
+// It may need to set the timestamp as well if the proposal is otherwise the same as
+// a previously signed proposal ie. we crashed after signing but before the proposal hit the WAL).
 func (pv *FilePV) signProposal(chainID string, proposal *types.Proposal) error {
 	height, round, step := proposal.Height, proposal.Round, stepPropose
 	signBytes := proposal.SignBytes(chainID)
@@ -203,6 +240,11 @@ func (pv *FilePV) signProposal(chainID string, proposal *types.Proposal) error {
 		return err
 	}
 
+	// We might crash before writing to the wal,
+	// causing us to try to re-sign for the same HRS.
+	// If signbytes are the same, use the last signature.
+	// If they only differ by timestamp, use last timestamp and signature
+	// Otherwise, return error
 	if sameHRS {
 		if bytes.Equal(signBytes, pv.LastSignBytes) {
 			proposal.Signature = pv.LastSignature
@@ -215,12 +257,14 @@ func (pv *FilePV) signProposal(chainID string, proposal *types.Proposal) error {
 		return err
 	}
 
+	// It passed the checks. Sign the proposal
 	sig := pv.PrivKey.Sign(signBytes)
 	pv.saveSigned(height, round, step, signBytes, sig)
 	proposal.Signature = sig
 	return nil
 }
 
+// Persist height/round/step and signature
 func (pv *FilePV) saveSigned(height int64, round int, step int8,
 	signBytes []byte, sig crypto.Signature) {
 
@@ -232,6 +276,8 @@ func (pv *FilePV) saveSigned(height int64, round int, step int8,
 	pv.save()
 }
 
+// SignHeartbeat signs a canonical representation of the heartbeat, along with the chainID.
+// Implements PrivValidator.
 func (pv *FilePV) SignHeartbeat(chainID string, heartbeat *types.Heartbeat) error {
 	pv.mtx.Lock()
 	defer pv.mtx.Unlock()
@@ -239,10 +285,15 @@ func (pv *FilePV) SignHeartbeat(chainID string, heartbeat *types.Heartbeat) erro
 	return nil
 }
 
+// String returns a string representation of the FilePV.
 func (pv *FilePV) String() string {
 	return fmt.Sprintf("PrivValidator{%v LH:%v, LR:%v, LS:%v}", pv.GetAddress(), pv.LastHeight, pv.LastRound, pv.LastStep)
 }
 
+//-------------------------------------
+
+// returns the timestamp from the lastSignBytes.
+// returns true if the only difference in the votes is their timestamp.
 func checkVotesOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (time.Time, bool) {
 	var lastVote, newVote types.CanonicalJSONVote
 	if err := cdc.UnmarshalJSON(lastSignBytes, &lastVote); err != nil {
@@ -257,6 +308,7 @@ func checkVotesOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (time.T
 		panic(err)
 	}
 
+	// set the times to the same value and check equality
 	now := types.CanonicalTime(time.Now())
 	lastVote.Timestamp = now
 	newVote.Timestamp = now
@@ -266,6 +318,8 @@ func checkVotesOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (time.T
 	return lastTime, bytes.Equal(newVoteBytes, lastVoteBytes)
 }
 
+// returns the timestamp from the lastSignBytes.
+// returns true if the only difference in the proposals is their timestamp
 func checkProposalsOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (time.Time, bool) {
 	var lastProposal, newProposal types.CanonicalJSONProposal
 	if err := cdc.UnmarshalJSON(lastSignBytes, &lastProposal); err != nil {
@@ -280,6 +334,7 @@ func checkProposalsOnlyDifferByTimestamp(lastSignBytes, newSignBytes []byte) (ti
 		panic(err)
 	}
 
+	// set the times to the same value and check equality
 	now := types.CanonicalTime(time.Now())
 	lastProposal.Timestamp = now
 	newProposal.Timestamp = now

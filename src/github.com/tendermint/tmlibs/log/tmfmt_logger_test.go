@@ -77,9 +77,11 @@ func benchmarkRunnerKitlog(b *testing.B, logger kitlog.Logger, f func(kitlog.Log
 }
 
 var (
-	baseMessage	= func(logger kitlog.Logger) { logger.Log("foo_key", "foo_value") }
-	withMessage	= func(logger kitlog.Logger) { kitlog.With(logger, "a", "b").Log("d", "f") }
+	baseMessage = func(logger kitlog.Logger) { logger.Log("foo_key", "foo_value") }
+	withMessage = func(logger kitlog.Logger) { kitlog.With(logger, "a", "b").Log("d", "f") }
 )
+
+// These test are designed to be run with the race detector.
 
 func testConcurrency(t *testing.T, logger kitlog.Logger, total int) {
 	n := int(math.Sqrt(float64(total)))
@@ -113,4 +115,4 @@ func spam(logger kitlog.Logger, count int) error {
 
 type mymap map[int]int
 
-func (m mymap) String() string	{ return "special_behavior" }
+func (m mymap) String() string { return "special_behavior" }

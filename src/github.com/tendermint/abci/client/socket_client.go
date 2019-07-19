@@ -14,36 +14,40 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
-const reqQueueSize = 256
-
-const flushThrottleMS = 20
+const reqQueueSize = 256 // TODO make configurable
+// const maxResponseSize = 1048576 // 1MB TODO make configurable
+const flushThrottleMS = 20 // Don't wait longer than...
 
 var _ Client = (*socketClient)(nil)
 
+// This is goroutine-safe, but users should beware that
+// the application in general is not meant to be interfaced
+// with concurrent callers.
 type socketClient struct {
 	cmn.BaseService
 
-	reqQueue	chan *ReqRes
-	flushTimer	*cmn.ThrottleTimer
-	mustConnect	bool
+	reqQueue    chan *ReqRes
+	flushTimer  *cmn.ThrottleTimer
+	mustConnect bool
 
-	mtx	sync.Mutex
-	addr	string
-	conn	net.Conn
-	err	error
-	reqSent	*list.List
-	resCb	func(*types.Request, *types.Response)
+	mtx     sync.Mutex
+	addr    string
+	conn    net.Conn
+	err     error
+	reqSent *list.List
+	resCb   func(*types.Request, *types.Response) // listens to all callbacks
+
 }
 
 func NewSocketClient(addr string, mustConnect bool) *socketClient {
 	cli := &socketClient{
-		reqQueue:	make(chan *ReqRes, reqQueueSize),
-		flushTimer:	cmn.NewThrottleTimer("socketClient", flushThrottleMS),
-		mustConnect:	mustConnect,
+		reqQueue:    make(chan *ReqRes, reqQueueSize),
+		flushTimer:  cmn.NewThrottleTimer("socketClient", flushThrottleMS),
+		mustConnect: mustConnect,
 
-		addr:		addr,
-		reqSent:	list.New(),
-		resCb:		nil,
+		addr:    addr,
+		reqSent: list.New(),
+		resCb:   nil,
 	}
 	cli.BaseService = *cmn.NewBaseService(nil, "socketClient", cli)
 	return cli
@@ -88,6 +92,7 @@ func (cli *socketClient) OnStop() {
 	cli.flushQueue()
 }
 
+// Stop the client and set the error
 func (cli *socketClient) StopForError(err error) {
 	if !cli.IsRunning() {
 		return
@@ -113,11 +118,15 @@ func (cli *socketClient) Error() error {
 	return cli.err
 }
 
+// Set listener for all responses
+// NOTE: callback may get internally generated flush responses.
 func (cli *socketClient) SetResponseCallback(resCb Callback) {
 	cli.mtx.Lock()
 	defer cli.mtx.Unlock()
 	cli.resCb = resCb
 }
+
+//----------------------------------------
 
 func (cli *socketClient) sendRequestsRoutine(conn net.Conn) {
 
@@ -128,7 +137,7 @@ func (cli *socketClient) sendRequestsRoutine(conn net.Conn) {
 			select {
 			case cli.reqQueue <- NewReqRes(types.ToRequestFlush()):
 			default:
-
+				// Probably will fill the buffer, or retry later.
 			}
 		case <-cli.Quit():
 			return
@@ -139,7 +148,7 @@ func (cli *socketClient) sendRequestsRoutine(conn net.Conn) {
 				cli.StopForError(fmt.Errorf("Error writing msg: %v", err))
 				return
 			}
-
+			// cli.Logger.Debug("Sent request", "requestType", reflect.TypeOf(reqres.Request), "request", reqres.Request)
 			if _, ok := reqres.Request.Value.(*types.Request_Flush); ok {
 				err = w.Flush()
 				if err != nil {
@@ -153,7 +162,7 @@ func (cli *socketClient) sendRequestsRoutine(conn net.Conn) {
 
 func (cli *socketClient) recvResponseRoutine(conn net.Conn) {
 
-	r := bufio.NewReader(conn)
+	r := bufio.NewReader(conn) // Buffer reads
 	for {
 		var res = &types.Response{}
 		err := types.ReadMessage(r, res)
@@ -163,11 +172,11 @@ func (cli *socketClient) recvResponseRoutine(conn net.Conn) {
 		}
 		switch r := res.Value.(type) {
 		case *types.Response_Exception:
-
+			// XXX After setting cli.err, release waiters (e.g. reqres.Done())
 			cli.StopForError(errors.New(r.Exception.Error))
 			return
 		default:
-
+			// cli.Logger.Debug("Received response", "responseType", reflect.TypeOf(res), "response", res)
 			err := cli.didRecvResponse(res)
 			if err != nil {
 				cli.StopForError(err)
@@ -187,6 +196,7 @@ func (cli *socketClient) didRecvResponse(res *types.Response) error {
 	cli.mtx.Lock()
 	defer cli.mtx.Unlock()
 
+	// Get the first ReqRes
 	next := cli.reqSent.Front()
 	if next == nil {
 		return fmt.Errorf("Unexpected result type %v when nothing expected", reflect.TypeOf(res.Value))
@@ -197,20 +207,24 @@ func (cli *socketClient) didRecvResponse(res *types.Response) error {
 			reflect.TypeOf(res.Value), reflect.TypeOf(reqres.Request.Value))
 	}
 
-	reqres.Response = res
-	reqres.Done()
-	cli.reqSent.Remove(next)
+	reqres.Response = res    // Set response
+	reqres.Done()            // Release waiters
+	cli.reqSent.Remove(next) // Pop first item from linked list
 
+	// Notify reqRes listener if set
 	if cb := reqres.GetCallback(); cb != nil {
 		cb(res)
 	}
 
+	// Notify client listener if set
 	if cli.resCb != nil {
 		cli.resCb(reqres.Request, res)
 	}
 
 	return nil
 }
+
+//----------------------------------------
 
 func (cli *socketClient) EchoAsync(msg string) *ReqRes {
 	return cli.queueRequest(types.ToRequestEcho(msg))
@@ -256,12 +270,14 @@ func (cli *socketClient) EndBlockAsync(req types.RequestEndBlock) *ReqRes {
 	return cli.queueRequest(types.ToRequestEndBlock(req))
 }
 
+//----------------------------------------
+
 func (cli *socketClient) FlushSync() error {
 	reqRes := cli.queueRequest(types.ToRequestFlush())
 	if err := cli.Error(); err != nil {
 		return err
 	}
-	reqRes.Wait()
+	reqRes.Wait() // NOTE: if we don't flush the queue, its possible to get stuck here
 	return cli.Error()
 }
 
@@ -325,11 +341,15 @@ func (cli *socketClient) EndBlockSync(req types.RequestEndBlock) (*types.Respons
 	return reqres.Response.GetEndBlock(), cli.Error()
 }
 
+//----------------------------------------
+
 func (cli *socketClient) queueRequest(req *types.Request) *ReqRes {
 	reqres := NewReqRes(req)
 
+	// TODO: set cli.err if reqQueue times out
 	cli.reqQueue <- reqres
 
+	// Maybe auto-flush, or unset auto-flush
 	switch req.Value.(type) {
 	case *types.Request_Flush:
 		cli.flushTimer.Unset()
@@ -351,6 +371,8 @@ LOOP:
 		}
 	}
 }
+
+//----------------------------------------
 
 func resMatchesReq(req *types.Request, res *types.Response) (ok bool) {
 	switch req.Value.(type) {

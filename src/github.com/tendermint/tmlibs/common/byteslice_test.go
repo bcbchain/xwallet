@@ -10,8 +10,8 @@ func TestPrefixEndBytes(t *testing.T) {
 	assert := assert.New(t)
 
 	var testCases = []struct {
-		prefix		[]byte
-		expected	[]byte
+		prefix   []byte
+		expected []byte
 	}{
 		{[]byte{byte(55), byte(255), byte(255), byte(0)}, []byte{byte(55), byte(255), byte(255), byte(1)}},
 		{[]byte{byte(55), byte(255), byte(255), byte(15)}, []byte{byte(55), byte(255), byte(255), byte(16)}},

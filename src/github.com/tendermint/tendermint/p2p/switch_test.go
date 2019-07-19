@@ -28,26 +28,26 @@ func init() {
 }
 
 type PeerMessage struct {
-	PeerID	ID
-	Bytes	[]byte
-	Counter	int
+	PeerID  ID
+	Bytes   []byte
+	Counter int
 }
 
 type TestReactor struct {
 	BaseReactor
 
-	mtx		sync.Mutex
-	channels	[]*conn.ChannelDescriptor
-	logMessages	bool
-	msgsCounter	int
-	msgsReceived	map[byte][]PeerMessage
+	mtx          sync.Mutex
+	channels     []*conn.ChannelDescriptor
+	logMessages  bool
+	msgsCounter  int
+	msgsReceived map[byte][]PeerMessage
 }
 
 func NewTestReactor(channels []*conn.ChannelDescriptor, logMessages bool) *TestReactor {
 	tr := &TestReactor{
-		channels:	channels,
-		logMessages:	logMessages,
-		msgsReceived:	make(map[byte][]PeerMessage),
+		channels:     channels,
+		logMessages:  logMessages,
+		msgsReceived: make(map[byte][]PeerMessage),
 	}
 	tr.BaseReactor = *NewBaseReactor("TestReactor", tr)
 	tr.SetLogger(log.TestingLogger())
@@ -58,15 +58,15 @@ func (tr *TestReactor) GetChannels() []*conn.ChannelDescriptor {
 	return tr.channels
 }
 
-func (tr *TestReactor) AddPeer(peer Peer)	{}
+func (tr *TestReactor) AddPeer(peer Peer) {}
 
-func (tr *TestReactor) RemovePeer(peer Peer, reason interface{})	{}
+func (tr *TestReactor) RemovePeer(peer Peer, reason interface{}) {}
 
 func (tr *TestReactor) Receive(chID byte, peer Peer, msgBytes []byte) {
 	if tr.logMessages {
 		tr.mtx.Lock()
 		defer tr.mtx.Unlock()
-
+		//fmt.Printf("Received: %X, %X\n", chID, msgBytes)
 		tr.msgsReceived[chID] = append(tr.msgsReceived[chID], PeerMessage{peer.ID(), msgBytes, tr.msgsCounter})
 		tr.msgsCounter++
 	}
@@ -78,17 +78,22 @@ func (tr *TestReactor) getMsgs(chID byte) []PeerMessage {
 	return tr.msgsReceived[chID]
 }
 
-func MakeSwitchPair(t testing.TB, initSwitch func(int, *Switch) *Switch) (*Switch, *Switch) {
+//-----------------------------------------------------------------------------
 
+// convenience method for creating two switches connected to each other.
+// XXX: note this uses net.Pipe and not a proper TCP conn
+func MakeSwitchPair(t testing.TB, initSwitch func(int, *Switch) *Switch) (*Switch, *Switch) {
+	// Create two switches that will be interconnected.
 	switches := MakeConnectedSwitches(config, 2, initSwitch, Connect2Switches)
 	return switches[0], switches[1]
 }
 
 func initSwitchFunc(i int, sw *Switch) *Switch {
 	sw.SetAddrBook(&addrBookMock{
-		addrs:		make(map[string]struct{}),
-		ourAddrs:	make(map[string]struct{})})
+		addrs:    make(map[string]struct{}),
+		ourAddrs: make(map[string]struct{})})
 
+	// Make two reactors of two channels each
 	sw.AddReactor("foo", NewTestReactor([]*conn.ChannelDescriptor{
 		{ID: byte(0x00), Priority: 10},
 		{ID: byte(0x01), Priority: 10},
@@ -113,6 +118,7 @@ func TestSwitches(t *testing.T) {
 		t.Errorf("Expected exactly 1 peer in s2, got %v", s2.Peers().Size())
 	}
 
+	// Lets send some messages
 	ch0Msg := []byte("channel zero")
 	ch1Msg := []byte("channel foo")
 	ch2Msg := []byte("channel bar")
@@ -159,6 +165,7 @@ func TestConnAddrFilter(t *testing.T) {
 		return nil
 	})
 
+	// connect to good peer
 	go func() {
 		err := s1.addPeerWithConnection(c1)
 		assert.NotNil(t, err, "expected err")
@@ -174,10 +181,16 @@ func TestConnAddrFilter(t *testing.T) {
 
 func TestSwitchFiltersOutItself(t *testing.T) {
 	s1 := MakeSwitch(config, 1, "127.0.0.2", "123.123.123", initSwitchFunc)
+	// addr := s1.NodeInfo().NetAddress()
 
+	// // add ourselves like we do in node.go#427
+	// s1.addrBook.AddOurAddress(addr)
+
+	// simulate s1 having a public IP by creating a remote peer with the same ID
 	rp := &remotePeer{PrivKey: s1.nodeKey.PrivKey, Config: DefaultPeerConfig()}
 	rp.Start()
 
+	// addr should be rejected in addPeer based on the same ID
 	err := s1.DialPeerWithAddress(rp.Addr(), false)
 	if assert.Error(t, err) {
 		assert.Equal(t, ErrSwitchConnectToSelf, err)
@@ -244,6 +257,7 @@ func TestSwitchStopsNonPersistentPeerOnError(t *testing.T) {
 	}
 	defer sw.Stop()
 
+	// simulate remote peer
 	rp := &remotePeer{PrivKey: crypto.GenPrivKeyEd25519(), Config: DefaultPeerConfig()}
 	rp.Start()
 	defer rp.Stop()
@@ -256,6 +270,7 @@ func TestSwitchStopsNonPersistentPeerOnError(t *testing.T) {
 	peer := sw.Peers().Get(rp.ID())
 	require.NotNil(peer)
 
+	// simulate failure by closing connection
 	pc.CloseConn()
 
 	assertNoPeersAfterTimeout(t, sw, 100*time.Millisecond)
@@ -272,12 +287,13 @@ func TestSwitchReconnectsToPersistentPeer(t *testing.T) {
 	}
 	defer sw.Stop()
 
+	// simulate remote peer
 	rp := &remotePeer{PrivKey: crypto.GenPrivKeyEd25519(), Config: DefaultPeerConfig()}
 	rp.Start()
 	defer rp.Stop()
 
 	pc, err := newOutboundPeerConn(rp.Addr(), DefaultPeerConfig(), true, sw.nodeKey.PrivKey)
-
+	//	sw.reactorsByCh, sw.chDescs, sw.StopPeerForError, sw.nodeKey.PrivKey,
 	require.Nil(err)
 
 	require.Nil(sw.addPeer(pc))
@@ -285,8 +301,10 @@ func TestSwitchReconnectsToPersistentPeer(t *testing.T) {
 	peer := sw.Peers().Get(rp.ID())
 	require.NotNil(peer)
 
+	// simulate failure by closing connection
 	pc.CloseConn()
 
+	// TODO: remove sleep, detect the disconnection, wait for reconnect
 	npeers := sw.Peers().Size()
 	for i := 0; i < 20; i++ {
 		time.Sleep(250 * time.Millisecond)
@@ -316,7 +334,7 @@ func TestSwitchFullConnectivity(t *testing.T) {
 
 func BenchmarkSwitchBroadcast(b *testing.B) {
 	s1, s2 := MakeSwitchPair(b, func(i int, sw *Switch) *Switch {
-
+		// Make bar reactors of bar channels each
 		sw.AddReactor("foo", NewTestReactor([]*conn.ChannelDescriptor{
 			{ID: byte(0x00), Priority: 10},
 			{ID: byte(0x01), Priority: 10},
@@ -330,12 +348,14 @@ func BenchmarkSwitchBroadcast(b *testing.B) {
 	defer s1.Stop()
 	defer s2.Stop()
 
+	// Allow time for goroutines to boot up
 	time.Sleep(1 * time.Second)
 
 	b.ResetTimer()
 
 	numSuccess, numFailure := 0, 0
 
+	// Send random message from foo channel to another
 	for i := 0; i < b.N; i++ {
 		chID := byte(i % 4)
 		successChan := s1.Broadcast(chID, []byte("test data"))
@@ -352,8 +372,8 @@ func BenchmarkSwitchBroadcast(b *testing.B) {
 }
 
 type addrBookMock struct {
-	addrs		map[string]struct{}
-	ourAddrs	map[string]struct{}
+	addrs    map[string]struct{}
+	ourAddrs map[string]struct{}
 }
 
 var _ AddrBook = (*addrBookMock)(nil)
@@ -362,12 +382,12 @@ func (book *addrBookMock) AddAddress(addr *NetAddress, src *NetAddress) error {
 	book.addrs[addr.String()] = struct{}{}
 	return nil
 }
-func (book *addrBookMock) AddOurAddress(addr *NetAddress)	{ book.ourAddrs[addr.String()] = struct{}{} }
+func (book *addrBookMock) AddOurAddress(addr *NetAddress) { book.ourAddrs[addr.String()] = struct{}{} }
 func (book *addrBookMock) OurAddress(addr *NetAddress) bool {
 	_, ok := book.ourAddrs[addr.String()]
 	return ok
 }
-func (book *addrBookMock) MarkGood(*NetAddress)	{}
+func (book *addrBookMock) MarkGood(*NetAddress) {}
 func (book *addrBookMock) HasAddress(addr *NetAddress) bool {
 	_, ok := book.addrs[addr.String()]
 	return ok
@@ -375,4 +395,4 @@ func (book *addrBookMock) HasAddress(addr *NetAddress) bool {
 func (book *addrBookMock) RemoveAddress(addr *NetAddress) {
 	delete(book.addrs, addr.String())
 }
-func (book *addrBookMock) Save()	{}
+func (book *addrBookMock) Save() {}

@@ -1,3 +1,8 @@
+// Copyright (c) 2013-2014 Conformal Systems LLC.
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+// Modified by Juan Benet (juan@benet.ai)
+
 package base58
 
 import (
@@ -7,20 +12,24 @@ import (
 	"github.com/pkg/errors"
 )
 
+// alphabet is the modified base58 alphabet used by Bitcoin.
 const BTCAlphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 const FlickrAlphabet = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
 
 var bigRadix = big.NewInt(58)
 var bigZero = big.NewInt(0)
 
+// Decode decodes a modified base58 string to a byte slice, using BTCAlphabet
 func Decode(b string) ([]byte, error) {
 	return DecodeAlphabet(b, BTCAlphabet)
 }
 
+// Encode encodes a byte slice to a modified base58 string, using BTCAlphabet
 func Encode(b []byte) string {
 	return EncodeAlphabet(b, BTCAlphabet)
 }
 
+// DecodeAlphabet decodes a modified base58 string to a byte slice, using alphabet.
 func DecodeAlphabet(b, alphabet string) ([]byte, error) {
 	answer := big.NewInt(0)
 	j := big.NewInt(1)
@@ -53,6 +62,7 @@ func DecodeAlphabet(b, alphabet string) ([]byte, error) {
 	return val, nil
 }
 
+// Encode encodes a byte slice to a modified base58 string, using alphabet
 func EncodeAlphabet(b []byte, alphabet string) string {
 	x := new(big.Int)
 	x.SetBytes(b)
@@ -64,6 +74,7 @@ func EncodeAlphabet(b []byte, alphabet string) string {
 		answer = append(answer, alphabet[mod.Int64()])
 	}
 
+	// leading zero bytes
 	for _, i := range b {
 		if i != 0 {
 			break
@@ -71,6 +82,7 @@ func EncodeAlphabet(b []byte, alphabet string) string {
 		answer = append(answer, alphabet[0])
 	}
 
+	// reverse
 	alen := len(answer)
 	for i := 0; i < alen/2; i++ {
 		answer[i], answer[alen-1-i] = answer[alen-1-i], answer[i]

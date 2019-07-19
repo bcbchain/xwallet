@@ -9,19 +9,31 @@ import (
 	dbm "github.com/tendermint/tmlibs/db"
 )
 
-func validateBlock(stateDB dbm.DB, s State, b *types.Block) error {
+//-----------------------------------------------------
+// Validate block
 
+func validateBlock(stateDB dbm.DB, s State, b *types.Block) error {
+	// validate internal consistency
 	if err := b.ValidateBasic(); err != nil {
 		return err
 	}
 
+	// validate basic info
 	if b.ChainID != s.ChainID {
 		return fmt.Errorf("Wrong Block.Header.ChainID. Expected %v, got %v", s.ChainID, b.ChainID)
 	}
 	if b.Height != s.LastBlockHeight+1 {
 		return fmt.Errorf("Wrong Block.Header.Height. Expected %v, got %v", s.LastBlockHeight+1, b.Height)
 	}
+	/*	TODO: Determine bounds for Time
+		See blockchain/reactor "stopSyncingDurationMinutes"
 
+		if !b.Time.After(lastBlockTime) {
+			return errors.New("Invalid Block.Header.Time")
+		}
+	*/
+
+	// validate prev block info
 	if !b.LastBlockID.Equals(s.LastBlockID) {
 		return fmt.Errorf("Wrong Block.Header.LastBlockID.  Expected %v, got %v", s.LastBlockID, b.LastBlockID)
 	}
@@ -30,6 +42,7 @@ func validateBlock(stateDB dbm.DB, s State, b *types.Block) error {
 		return fmt.Errorf("Wrong Block.Header.TotalTxs. Expected %v, got %v", s.LastBlockTotalTx+newTxs, b.TotalTxs)
 	}
 
+	// validate app info
 	if !bytes.Equal(b.LastAppHash, s.LastAppHash) {
 		return fmt.Errorf("Wrong Block.Header.AppHash.  Expected %X, got %v", s.LastAppHash, b.LastAppHash)
 	}
@@ -43,6 +56,7 @@ func validateBlock(stateDB dbm.DB, s State, b *types.Block) error {
 		return fmt.Errorf("Wrong Block.Header.ValidatorsHash.  Expected %X, got %v", s.Validators.Hash(), b.ValidatorsHash)
 	}
 
+	// Validate block LastCommit.
 	if b.Height == 1 {
 		if len(b.LastCommit.Precommits) != 0 {
 			return errors.New("Block at height 1 (first block) should have no LastCommit precommits")
@@ -68,6 +82,11 @@ func validateBlock(stateDB dbm.DB, s State, b *types.Block) error {
 	return nil
 }
 
+// XXX: What's cheaper (ie. what should be checked first):
+//  evidence internal validity (ie. sig checks) or validator existed (fetch historical val set from db)
+
+// VerifyEvidence verifies the evidence fully by checking it is internally
+// consistent and sufficiently recent.
 func VerifyEvidence(stateDB dbm.DB, s State, evidence types.Evidence) error {
 	height := s.LastBlockHeight
 
@@ -84,10 +103,12 @@ func VerifyEvidence(stateDB dbm.DB, s State, evidence types.Evidence) error {
 
 	valset, err := LoadValidators(stateDB, evidence.Height())
 	if err != nil {
-
+		// TODO: if err is just that we cant find it cuz we pruned, ignore.
+		// TODO: if its actually bad evidence, punish peer
 		return err
 	}
 
+	// The address must have been an active validator at the height
 	ev := evidence
 	height, addr, idx := ev.Height(), ev.Address(), ev.Index()
 	valIdx, val := valset.GetByAddress(addr)

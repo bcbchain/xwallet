@@ -15,22 +15,24 @@ import (
 
 var _ Client = (*grpcClient)(nil)
 
+// A stripped copy of the remoteClient that makes
+// synchronous calls using grpc
 type grpcClient struct {
 	cmn.BaseService
-	mustConnect	bool
+	mustConnect bool
 
-	client	types.ABCIApplicationClient
+	client types.ABCIApplicationClient
 
-	mtx	sync.Mutex
-	addr	string
-	err	error
-	resCb	func(*types.Request, *types.Response)
+	mtx   sync.Mutex
+	addr  string
+	err   error
+	resCb func(*types.Request, *types.Response) // listens to all callbacks
 }
 
 func NewGRPCClient(addr string, mustConnect bool) *grpcClient {
 	cli := &grpcClient{
-		addr:		addr,
-		mustConnect:	mustConnect,
+		addr:        addr,
+		mustConnect: mustConnect,
 	}
 	cli.BaseService = *cmn.NewBaseService(nil, "grpcClient", cli)
 	return cli
@@ -78,7 +80,10 @@ func (cli *grpcClient) OnStop() {
 	cli.BaseService.OnStop()
 	cli.mtx.Lock()
 	defer cli.mtx.Unlock()
-
+	// TODO: how to close conn? its not a net.Conn and grpc doesn't expose a Close()
+	/*if cli.client.conn != nil {
+		cli.client.conn.Close()
+	}*/
 }
 
 func (cli *grpcClient) StopForError(err error) {
@@ -102,11 +107,21 @@ func (cli *grpcClient) Error() error {
 	return cli.err
 }
 
+// Set listener for all responses
+// NOTE: callback may get internally generated flush responses.
 func (cli *grpcClient) SetResponseCallback(resCb Callback) {
 	cli.mtx.Lock()
 	defer cli.mtx.Unlock()
 	cli.resCb = resCb
 }
+
+//----------------------------------------
+// GRPC calls are synchronous, but some callbacks expect to be called asynchronously
+// (eg. the mempool expects to be able to lock to remove bad txs from cache).
+// To accommodate, we finish each call in its own go-routine,
+// which is expensive, but easy - if you want something better, use the socket protocol!
+// maybe one day, if people really want it, we use grpc streams,
+// but hopefully not :D
 
 func (cli *grpcClient) EchoAsync(msg string) *ReqRes {
 	req := types.ToRequestEcho(msg)
@@ -209,16 +224,18 @@ func (cli *grpcClient) EndBlockAsync(params types.RequestEndBlock) *ReqRes {
 
 func (cli *grpcClient) finishAsyncCall(req *types.Request, res *types.Response) *ReqRes {
 	reqres := NewReqRes(req)
-	reqres.Response = res
-	reqres.Done()
-	reqres.SetDone()
+	reqres.Response = res // Set response
+	reqres.Done()         // Release waiters
+	reqres.SetDone()      // so reqRes.SetCallback will run the callback
 
+	// go routine for callbacks
 	go func() {
-
+		// Notify reqRes listener if set
 		if cb := reqres.GetCallback(); cb != nil {
 			cb(res)
 		}
 
+		// Notify client listener if set
 		if cli.resCb != nil {
 			cli.resCb(reqres.Request, res)
 		}
@@ -226,13 +243,15 @@ func (cli *grpcClient) finishAsyncCall(req *types.Request, res *types.Response) 
 	return reqres
 }
 
+//----------------------------------------
+
 func (cli *grpcClient) FlushSync() error {
 	return nil
 }
 
 func (cli *grpcClient) EchoSync(msg string) (*types.ResponseEcho, error) {
 	reqres := cli.EchoAsync(msg)
-
+	// StopForError should already have been called if error is set
 	return reqres.Response.GetEcho(), cli.Error()
 }
 

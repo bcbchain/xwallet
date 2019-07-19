@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Implementation of the TMDecoder interface.
 type TMDecoderPure struct {
 }
 
@@ -192,7 +193,7 @@ func (e TMDecoderPure) DecodeUvarint(inp []byte) (i uint, bytesRead int, err err
 	}
 	if size == 0 {
 		bytesRead = 1
-
+		// i = 0 // already 0
 		return
 	}
 	if int(size+1) > inpSize {
@@ -226,7 +227,7 @@ func (e TMDecoderPure) DecodeVarint(inp []byte) (i int, bytesRead int, err error
 			bytesRead = errorBytesRead
 		} else {
 			bytesRead = 1
-
+			// i = 0 // already 0
 		}
 		return
 	}

@@ -17,6 +17,9 @@ import (
 
 var subscribeTimeout = 5 * time.Second
 
+//----------------------------------------------
+// These interfaces are used by RPC and must be thread safe
+
 type Consensus interface {
 	GetState() sm.State
 	GetValidators() (int64, []*types.Validator)
@@ -32,26 +35,33 @@ type P2P interface {
 	DialPeersAsync(p2p.AddrBook, []string, bool) error
 }
 
+//----------------------------------------------
+// These package level globals come with setters
+// that are expected to be called only once, on startup
+
 var (
-	proxyAppQuery	proxy.AppConnQuery
+	// external, thread safe interfaces
+	proxyAppQuery proxy.AppConnQuery
 
-	stateDB		dbm.DB
-	blockStore	types.BlockStore
-	mempool		types.Mempool
-	evidencePool	types.EvidencePool
-	consensusState	Consensus
-	p2pSwitch	P2P
+	// interfaces defined in types and above
+	stateDB        dbm.DB
+	blockStore     types.BlockStore
+	mempool        types.Mempool
+	evidencePool   types.EvidencePool
+	consensusState Consensus
+	p2pSwitch      P2P
 
-	pubKey			crypto.PubKey
-	genDoc			*types.GenesisDoc
-	addrBook		p2p.AddrBook
-	txIndexer		txindex.TxIndexer
-	consensusReactor	*consensus.ConsensusReactor
-	eventBus		*types.EventBus
+	// objects
+	pubKey           crypto.PubKey
+	genDoc           *types.GenesisDoc // cache the genesis structure
+	addrBook         p2p.AddrBook
+	txIndexer        txindex.TxIndexer
+	consensusReactor *consensus.ConsensusReactor
+	eventBus         *types.EventBus // thread safe
 
-	logger	log.Logger
+	logger log.Logger
 
-	privatePeerIDs	[]string
+	privatePeerIDs []string
 )
 
 func SetPrivatePeerIDs(pids string) {

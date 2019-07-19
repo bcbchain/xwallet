@@ -23,10 +23,11 @@ func TestEventBusPublishEventTx(t *testing.T) {
 	defer eventBus.Stop()
 
 	tx := Tx("foo")
-	result := abci.ResponseDeliverTx{Data: []byte("bar"), Tags: []cmn.KVPair{}, Fee: cmn.KI64Pair{Key: []uint8{}, Value: 0}}
+	result := abci.ResponseDeliverTx{Data: "bar", Tags: []cmn.KVPair{}, Fee: 0}
 
 	txEventsCh := make(chan interface{})
 
+	// PublishEventTx adds all these 3 tags, so the query below should work
 	query := fmt.Sprintf("tm.event='Tx' AND tx.height=1 AND tx.hash='%X'", tx.Hash())
 	err = eventBus.Subscribe(context.Background(), "test", tmquery.MustParse(query), txEventsCh)
 	require.NoError(t, err)
@@ -44,10 +45,10 @@ func TestEventBusPublishEventTx(t *testing.T) {
 	}()
 
 	err = eventBus.PublishEventTx(EventDataTx{TxResult{
-		Height:	1,
-		Index:	0,
-		Tx:	tx,
-		Result:	result,
+		Height: 1,
+		Index:  0,
+		Tx:     tx,
+		Result: result,
 	}})
 	assert.NoError(t, err)
 
@@ -60,10 +61,10 @@ func TestEventBusPublishEventTx(t *testing.T) {
 
 func BenchmarkEventBus(b *testing.B) {
 	benchmarks := []struct {
-		name		string
-		numClients	int
-		randQueries	bool
-		randEvents	bool
+		name        string
+		numClients  int
+		randQueries bool
+		randEvents  bool
 	}{
 		{"10Clients1Query1Event", 10, false, false},
 		{"100Clients", 100, false, false},
@@ -90,10 +91,10 @@ func BenchmarkEventBus(b *testing.B) {
 }
 
 func benchmarkEventBus(numClients int, randQueries bool, randEvents bool, b *testing.B) {
-
+	// for random* functions
 	rand.Seed(time.Now().Unix())
 
-	eventBus := NewEventBusWithBufferCapacity(0)
+	eventBus := NewEventBusWithBufferCapacity(0) // set buffer capacity to 0 so we are not testing cache
 	eventBus.Start()
 	defer eventBus.Stop()
 

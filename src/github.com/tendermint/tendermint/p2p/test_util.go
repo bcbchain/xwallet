@@ -22,10 +22,10 @@ func CreateRandomPeer(outbound bool) *peer {
 			outbound: outbound,
 		},
 		nodeInfo: NodeInfo{
-			ID:		netAddr.ID,
-			ListenAddr:	netAddr.DialString(),
+			ID:         netAddr.ID,
+			ListenAddr: netAddr.DialString(),
 		},
-		mconn:	&conn.MConnection{},
+		mconn: &conn.MConnection{},
 	}
 	p.SetLogger(log.TestingLogger().With("peer", addr))
 	return p
@@ -46,6 +46,13 @@ func CreateRoutableAddr() (addr string, netAddr *NetAddress) {
 	return
 }
 
+//------------------------------------------------------------------
+// Connects switches via arbitrary net.Conn. Used for testing.
+
+// MakeConnectedSwitches returns n switches, connected according to the connect func.
+// If connect==Connect2Switches, the switches will be fully connected.
+// initSwitch defines how the i'th switch should be initialized (ie. with what reactors).
+// NOTE: panics if any switch fails to start.
 func MakeConnectedSwitches(cfg *cfg.P2PConfig, n int, initSwitch func(int, *Switch) *Switch, connect func([]*Switch, int, int)) []*Switch {
 	switches := make([]*Switch, n)
 	for i := 0; i < n; i++ {
@@ -65,6 +72,9 @@ func MakeConnectedSwitches(cfg *cfg.P2PConfig, n int, initSwitch func(int, *Swit
 	return switches
 }
 
+// Connect2Switches will connect switches i and j via net.Pipe().
+// Blocks until a connection is established.
+// NOTE: caller ensures i and j are within bounds.
 func Connect2Switches(switches []*Switch, i, j int) {
 	switchI := switches[i]
 	switchJ := switches[j]
@@ -104,9 +114,11 @@ func (sw *Switch) addPeerWithConnection(conn net.Conn) error {
 	return nil
 }
 
+// StartSwitches calls sw.Start() for each given switch.
+// It returns the first encountered error.
 func StartSwitches(switches []*Switch) error {
 	for _, s := range switches {
-		err := s.Start()
+		err := s.Start() // start switch and reactors
 		if err != nil {
 			return err
 		}
@@ -115,7 +127,8 @@ func StartSwitches(switches []*Switch) error {
 }
 
 func MakeSwitch(cfg *cfg.P2PConfig, i int, network, version string, initSwitch func(int, *Switch) *Switch) *Switch {
-
+	// new switch, add reactors
+	// TODO: let the config be passed in?
 	nodeKey := &NodeKey{
 		PrivKey: crypto.GenPrivKeyEd25519(),
 	}
@@ -123,11 +136,11 @@ func MakeSwitch(cfg *cfg.P2PConfig, i int, network, version string, initSwitch f
 	sw.SetLogger(log.TestingLogger())
 	sw = initSwitch(i, sw)
 	ni := NodeInfo{
-		ID:		nodeKey.ID(),
-		Moniker:	cmn.Fmt("switch%d", i),
-		Network:	network,
-		Version:	version,
-		ListenAddr:	cmn.Fmt("%v:%v", network, cmn.RandIntn(64512)+1023),
+		ID:         nodeKey.ID(),
+		Moniker:    cmn.Fmt("switch%d", i),
+		Network:    network,
+		Version:    version,
+		ListenAddr: cmn.Fmt("%v:%v", network, cmn.RandIntn(64512)+1023),
 	}
 	for ch := range sw.reactorsByCh {
 		ni.Channels = append(ni.Channels, ch)

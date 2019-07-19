@@ -11,10 +11,11 @@ var templates = typewriter.TemplateSlice{
 	register,
 }
 
+// this is the template for generating the go-data wrappers of an interface
 var wrapper = &typewriter.Template{
-	Name:		"Wrapper",
-	TypeConstraint:	typewriter.Constraint{},
-	FuncMap:	fmap,
+	Name:           "Wrapper",
+	TypeConstraint: typewriter.Constraint{},
+	FuncMap:        fmap,
 	Text: `
 type {{.Wrapper}} struct {
   {{.Inner}} "json:\"unwrap\""
@@ -52,9 +53,9 @@ func (h {{.Wrapper}}) Empty() bool {
 }
 
 var register = &typewriter.Template{
-	Name:		"Register",
-	TypeConstraint:	typewriter.Constraint{},
-	FuncMap:	fmap,
+	Name:           "Register",
+	TypeConstraint: typewriter.Constraint{},
+	FuncMap:        fmap,
 	Text: `
 func init() {
   {{.Wrapper}}Mapper.RegisterImplementation({{ if .Impl.Pointer }}&{{ end }}{{.Impl.Name}}{}, "{{.ImplType }}", 0x{{.Count}})

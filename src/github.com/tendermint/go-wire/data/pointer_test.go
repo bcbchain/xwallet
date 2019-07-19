@@ -13,6 +13,7 @@ type Ptr interface {
 	Point() string
 }
 
+// implementations
 type PStr string
 type PInt int
 
@@ -32,6 +33,8 @@ func (p *PInt) Point() string {
 
 var ptrMapper data.Mapper
 
+// we register pointers to those structs, as they fulfill the interface
+// but mainly so we can test how they handle nil values in the struct
 func init() {
 	ps, pi := PStr(""), PInt(0)
 	ptrMapper = data.NewMapper(KeyS{}).
@@ -39,6 +42,7 @@ func init() {
 		RegisterImplementation(&pi, "int", 25)
 }
 
+// PtrS adds json serialization to Ptr
 type PtrS struct {
 	Ptr
 }
@@ -55,6 +59,7 @@ func (p *PtrS) UnmarshalJSON(data []byte) (err error) {
 	return
 }
 
+// TestEncodingNil happens when we have a nil inside the embedding struct
 func TestEncodingNil(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 

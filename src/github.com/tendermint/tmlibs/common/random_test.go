@@ -32,9 +32,13 @@ func TestRandIntn(t *testing.T) {
 	}
 }
 
+// Test to make sure that we never call math.rand().
+// We do this by ensuring that outputs are deterministic.
 func TestDeterminism(t *testing.T) {
 	var firstOutput string
 
+	// Set math/rand's seed for the sake of debugging this test.
+	// (It isn't strictly necessary).
 	mrand.Seed(1)
 
 	for i := 0; i < 100; i++ {
@@ -52,8 +56,10 @@ func TestDeterminism(t *testing.T) {
 
 func testThemAll() string {
 
+	// Such determinism.
 	grand.reset(1)
 
+	// Use it.
 	out := new(bytes.Buffer)
 	perm := RandPerm(10)
 	blob, _ := json.Marshal(perm)

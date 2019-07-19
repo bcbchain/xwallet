@@ -47,7 +47,7 @@ func (e TMVarintV0) EncodeVarint(i int) []byte {
 	}
 	var size = uvarintSize(uint64(i))
 	if negate {
-
+		// e.g. 0xF1 for a single negative byte
 		legacy.WriteUint8(uint8(size+0xF0), w, n, err)
 	} else {
 		legacy.WriteUint8(uint8(size), w, n, err)

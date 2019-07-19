@@ -11,12 +11,13 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+// Returns an empty kvstore peer
 func randPeer() *peer {
 	nodeKey := NodeKey{PrivKey: crypto.GenPrivKeyEd25519()}
 	return &peer{
 		nodeInfo: NodeInfo{
-			ID:		nodeKey.ID(),
-			ListenAddr:	cmn.Fmt("%v.%v.%v.%v:46656", rand.Int()%256, rand.Int()%256, rand.Int()%256, rand.Int()%256),
+			ID:         nodeKey.ID(),
+			ListenAddr: cmn.Fmt("%v.%v.%v.%v:46656", rand.Int()%256, rand.Int()%256, rand.Int()%256, rand.Int()%256),
 		},
 	}
 }
@@ -35,24 +36,27 @@ func TestPeerSetAddRemoveOne(t *testing.T) {
 	}
 
 	n := len(peerList)
-
+	// 1. Test removing from the front
 	for i, peerAtFront := range peerList {
 		peerSet.Remove(peerAtFront)
 		wantSize := n - i - 1
 		for j := 0; j < 2; j++ {
 			assert.Equal(t, false, peerSet.Has(peerAtFront.ID()), "#%d Run #%d: failed to remove peer", i, j)
 			assert.Equal(t, wantSize, peerSet.Size(), "#%d Run #%d: failed to remove peer and decrement size", i, j)
-
+			// Test the route of removing the now non-existent element
 			peerSet.Remove(peerAtFront)
 		}
 	}
 
+	// 2. Next we are testing removing the peer at the end
+	// a) Replenish the peerSet
 	for _, peer := range peerList {
 		if err := peerSet.Add(peer); err != nil {
 			t.Error(err)
 		}
 	}
 
+	// b) In reverse, remove each element
 	for i := n - 1; i >= 0; i-- {
 		peerAtEnd := peerList[i]
 		peerSet.Remove(peerAtEnd)
@@ -96,19 +100,26 @@ func TestPeerSetAddDuplicate(t *testing.T) {
 
 	n := 20
 	errsChan := make(chan error)
-
+	// Add the same asynchronously to test the
+	// concurrent guarantees of our APIs, and
+	// our expectation in the end is that only
+	// one addition succeeded, but the rest are
+	// instances of ErrSwitchDuplicatePeer.
 	for i := 0; i < n; i++ {
 		go func() {
 			errsChan <- peerSet.Add(peer)
 		}()
 	}
 
+	// Now collect and tally the results
 	errsTally := make(map[error]int)
 	for i := 0; i < n; i++ {
 		err := <-errsChan
 		errsTally[err]++
 	}
 
+	// Our next procedure is to ensure that only one addition
+	// succeeded and that the rest are each ErrSwitchDuplicatePeer.
 	wantErrCount, gotErrCount := n-1, errsTally[ErrSwitchDuplicatePeer]
 	assert.Equal(t, wantErrCount, gotErrCount, "invalid ErrSwitchDuplicatePeer count")
 
@@ -128,7 +139,8 @@ func TestPeerSetGet(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
-
+		// Add them asynchronously to test the
+		// concurrent guarantees of our APIs.
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()

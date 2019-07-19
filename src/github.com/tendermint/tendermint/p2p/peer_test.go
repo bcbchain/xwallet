@@ -19,6 +19,7 @@ const testCh = 0x01
 func TestPeerBasic(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 
+	// simulate remote peer
 	rp := &remotePeer{PrivKey: crypto.GenPrivKeyEd25519(), Config: DefaultPeerConfig()}
 	rp.Start()
 	defer rp.Stop()
@@ -45,6 +46,7 @@ func TestPeerWithoutAuthEnc(t *testing.T) {
 	config := DefaultPeerConfig()
 	config.AuthEnc = false
 
+	// simulate remote peer
 	rp := &remotePeer{PrivKey: crypto.GenPrivKeyEd25519(), Config: config}
 	rp.Start()
 	defer rp.Stop()
@@ -65,6 +67,7 @@ func TestPeerSend(t *testing.T) {
 	config := DefaultPeerConfig()
 	config.AuthEnc = false
 
+	// simulate remote peer
 	rp := &remotePeer{PrivKey: crypto.GenPrivKeyEd25519(), Config: config}
 	rp.Start()
 	defer rp.Stop()
@@ -92,11 +95,11 @@ func createOutboundPeerAndPerformHandshake(addr *NetAddress, config *PeerConfig)
 		return nil, err
 	}
 	nodeInfo, err := pc.HandshakeTimeout(NodeInfo{
-		ID:		addr.ID,
-		Moniker:	"host_peer",
-		Network:	"testing",
-		Version:	"123.123.123",
-		Channels:	[]byte{testCh},
+		ID:       addr.ID,
+		Moniker:  "host_peer",
+		Network:  "testing",
+		Version:  "123.123.123",
+		Channels: []byte{testCh},
 	}, 1*time.Second)
 	if err != nil {
 		return nil, err
@@ -108,10 +111,10 @@ func createOutboundPeerAndPerformHandshake(addr *NetAddress, config *PeerConfig)
 }
 
 type remotePeer struct {
-	PrivKey	crypto.PrivKey
-	Config	*PeerConfig
-	addr	*NetAddress
-	quit	chan struct{}
+	PrivKey crypto.PrivKey
+	Config  *PeerConfig
+	addr    *NetAddress
+	quit    chan struct{}
 }
 
 func (p *remotePeer) Addr() *NetAddress {
@@ -123,7 +126,7 @@ func (p *remotePeer) ID() ID {
 }
 
 func (p *remotePeer) Start() {
-	l, e := net.Listen("tcp", "127.0.0.1:0")
+	l, e := net.Listen("tcp", "127.0.0.1:0") // any available address
 	if e != nil {
 		golog.Fatalf("net.Listen tcp :0: %+v", e)
 	}
@@ -149,12 +152,12 @@ func (p *remotePeer) accept(l net.Listener) {
 			golog.Fatalf("Failed to create a peer: %+v", err)
 		}
 		_, err = pc.HandshakeTimeout(NodeInfo{
-			ID:		p.Addr().ID,
-			Moniker:	"remote_peer",
-			Network:	"testing",
-			Version:	"123.123.123",
-			ListenAddr:	l.Addr().String(),
-			Channels:	[]byte{testCh},
+			ID:         p.Addr().ID,
+			Moniker:    "remote_peer",
+			Network:    "testing",
+			Version:    "123.123.123",
+			ListenAddr: l.Addr().String(),
+			Channels:   []byte{testCh},
 		}, 1*time.Second)
 		if err != nil {
 			golog.Fatalf("Failed to perform handshake: %+v", err)

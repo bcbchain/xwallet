@@ -24,12 +24,14 @@ const (
 
 var _ txindex.TxIndexer = (*TxIndex)(nil)
 
+// TxIndex is the simplest possible indexer, backed by key-value storage (levelDB).
 type TxIndex struct {
-	store		dbm.DB
-	tagsToIndex	[]string
-	indexAllTags	bool
+	store        dbm.DB
+	tagsToIndex  []string
+	indexAllTags bool
 }
 
+// NewTxIndex creates new KV indexer.
 func NewTxIndex(store dbm.DB, options ...func(*TxIndex)) *TxIndex {
 	txi := &TxIndex{store: store, tagsToIndex: make([]string, 0), indexAllTags: false}
 	for _, o := range options {
@@ -38,18 +40,22 @@ func NewTxIndex(store dbm.DB, options ...func(*TxIndex)) *TxIndex {
 	return txi
 }
 
+// IndexTags is an option for setting which tags to index.
 func IndexTags(tags []string) func(*TxIndex) {
 	return func(txi *TxIndex) {
 		txi.tagsToIndex = tags
 	}
 }
 
+// IndexAllTags is an option for indexing all tags.
 func IndexAllTags() func(*TxIndex) {
 	return func(txi *TxIndex) {
 		txi.indexAllTags = true
 	}
 }
 
+// Get gets transaction from the TxIndex storage and returns it or nil if the
+// transaction is not found.
 func (txi *TxIndex) Get(hash []byte) (*types.TxResult, error) {
 	if len(hash) == 0 {
 		return nil, txindex.ErrorEmptyHash
@@ -69,18 +75,21 @@ func (txi *TxIndex) Get(hash []byte) (*types.TxResult, error) {
 	return txResult, nil
 }
 
+// AddBatch indexes a batch of transactions using the given list of tags.
 func (txi *TxIndex) AddBatch(b *txindex.Batch) error {
 	storeBatch := txi.store.NewBatch()
 
 	for _, result := range b.Ops {
 		hash := result.Tx.Hash()
 
+		// index tx by tags
 		for _, tag := range result.Result.Tags {
 			if txi.indexAllTags || cmn.StringInSlice(string(tag.Key), txi.tagsToIndex) {
 				storeBatch.Set(keyForTag(tag, result), hash)
 			}
 		}
 
+		// index tx by hash
 		rawBytes, err := cdc.MarshalBinaryBare(result)
 		if err != nil {
 			return err
@@ -92,17 +101,20 @@ func (txi *TxIndex) AddBatch(b *txindex.Batch) error {
 	return nil
 }
 
+// Index indexes a single transaction using the given list of tags.
 func (txi *TxIndex) Index(result *types.TxResult) error {
 	b := txi.store.NewBatch()
 
 	hash := result.Tx.Hash()
 
+	// index tx by tags
 	for _, tag := range result.Result.Tags {
 		if txi.indexAllTags || cmn.StringInSlice(string(tag.Key), txi.tagsToIndex) {
 			b.Set(keyForTag(tag, result), hash)
 		}
 	}
 
+	// index tx by hash
 	rawBytes, err := cdc.MarshalBinaryBare(result)
 	if err != nil {
 		return err
@@ -113,12 +125,20 @@ func (txi *TxIndex) Index(result *types.TxResult) error {
 	return nil
 }
 
+// Search performs a search using the given query. It breaks the query into
+// conditions (like "tx.height > 5"). For each condition, it queries the DB
+// index. One special use cases here: (1) if "tx.hash" is found, it returns tx
+// result for it (2) for range queries it is better for the client to provide
+// both lower and upper bounds, so we are not performing a full scan. Results
+// from querying indexes are then intersected and returned to the caller.
 func (txi *TxIndex) Search(q *query.Query) ([]*types.TxResult, error) {
 	var hashes [][]byte
 	var hashesInitialized bool
 
+	// get a list of conditions (like "tx.height > 5")
 	conditions := q.Conditions()
 
+	// if there is a hash condition, return the result immediately
 	hash, err, ok := lookForHash(conditions)
 	if err != nil {
 		return nil, errors.Wrap(err, "error during searching for a hash in the query")
@@ -130,13 +150,18 @@ func (txi *TxIndex) Search(q *query.Query) ([]*types.TxResult, error) {
 		return []*types.TxResult{res}, errors.Wrap(err, "error while retrieving the result")
 	}
 
+	// conditions to skip because they're handled before "everything else"
 	skipIndexes := make([]int, 0)
 
+	// if there is a height condition ("tx.height=3"), extract it for faster lookups
 	height, heightIndex := lookForHeight(conditions)
 	if heightIndex >= 0 {
 		skipIndexes = append(skipIndexes, heightIndex)
 	}
 
+	// extract ranges
+	// if both upper and lower bounds exist, it's better to get them in order not
+	// no iterate over kvs that are not within range.
 	ranges, rangeIndexes := lookForRanges(conditions)
 	if len(ranges) > 0 {
 		skipIndexes = append(skipIndexes, rangeIndexes...)
@@ -151,6 +176,7 @@ func (txi *TxIndex) Search(q *query.Query) ([]*types.TxResult, error) {
 		}
 	}
 
+	// for all other conditions
 	for i, c := range conditions {
 		if cmn.IntInSlice(i, skipIndexes) {
 			continue
@@ -174,6 +200,7 @@ func (txi *TxIndex) Search(q *query.Query) ([]*types.TxResult, error) {
 		i++
 	}
 
+	// sort by height by default
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Height < results[j].Height
 	})
@@ -200,14 +227,16 @@ func lookForHeight(conditions []query.Condition) (height int64, index int) {
 	return 0, -1
 }
 
+// special map to hold range conditions
+// Example: account.number => queryRange{lowerBound: 1, upperBound: 5}
 type queryRanges map[string]queryRange
 
 type queryRange struct {
-	key			string
-	lowerBound		interface{}
-	includeLowerBound	bool
-	upperBound		interface{}
-	includeUpperBound	bool
+	key               string
+	lowerBound        interface{} // int || time.Time
+	includeLowerBound bool
+	upperBound        interface{} // int || time.Time
+	includeUpperBound bool
 }
 
 func (r queryRange) lowerBoundValue() interface{} {
@@ -300,7 +329,9 @@ func (txi *TxIndex) match(c query.Condition, startKey []byte) (hashes [][]byte) 
 			hashes = append(hashes, it.Value())
 		}
 	} else if c.Op == query.OpContains {
-
+		// XXX: doing full scan because startKey does not apply here
+		// For example, if startKey = "account.owner=an" and search query = "accoutn.owner CONSISTS an"
+		// we can't iterate with prefix "account.owner=an" because we might miss keys like "account.owner=Ulan"
 		it := txi.store.Iterator(nil, nil)
 		defer it.Close()
 		for ; it.Valid(); it.Next() {
@@ -318,7 +349,7 @@ func (txi *TxIndex) match(c query.Condition, startKey []byte) (hashes [][]byte) 
 }
 
 func (txi *TxIndex) matchRange(r queryRange, prefix []byte) (hashes [][]byte) {
-
+	// create a map to prevent duplicates
 	hashesMap := make(map[string][]byte)
 
 	lowerBound := r.lowerBoundValue()
@@ -347,7 +378,12 @@ LOOP:
 			if include {
 				hashesMap[fmt.Sprintf("%X", it.Value())] = it.Value()
 			}
-
+			// XXX: passing time in a ABCI Tags is not yet implemented
+			// case time.Time:
+			// 	v := strconv.ParseInt(extractValueFromKey(it.Key()), 10, 64)
+			// 	if v == r.upperBound {
+			// 		break
+			// 	}
 		}
 	}
 	hashes = make([][]byte, len(hashesMap))
@@ -358,6 +394,9 @@ LOOP:
 	}
 	return
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Keys
 
 func startKey(c query.Condition, height int64) []byte {
 	var key string
@@ -381,6 +420,9 @@ func extractValueFromKey(key []byte) string {
 func keyForTag(tag cmn.KVPair, result *types.TxResult) []byte {
 	return []byte(fmt.Sprintf("%s/%s/%d/%d", tag.Key, tag.Value, result.Height, result.Index))
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Utils
 
 func intersect(as, bs [][]byte) [][]byte {
 	i := make([][]byte, 0, cmn.MinInt(len(as), len(bs)))

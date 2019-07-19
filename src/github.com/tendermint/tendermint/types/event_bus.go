@@ -17,17 +17,22 @@ type EventBusSubscriber interface {
 	UnsubscribeAll(ctx context.Context, subscriber string) error
 }
 
+// EventBus is a common bus for all events going through the system. All calls
+// are proxied to underlying pubsub server. All events must be published using
+// EventBus to ensure correct data types.
 type EventBus struct {
 	cmn.BaseService
-	pubsub	*tmpubsub.Server
+	pubsub *tmpubsub.Server
 }
 
+// NewEventBus returns a new event bus.
 func NewEventBus() *EventBus {
 	return NewEventBusWithBufferCapacity(defaultCapacity)
 }
 
+// NewEventBusWithBufferCapacity returns a new event bus with the given buffer capacity.
 func NewEventBusWithBufferCapacity(cap int) *EventBus {
-
+	// capacity could be exposed later if needed
 	pubsub := tmpubsub.NewServer(tmpubsub.BufferCapacity(cap))
 	b := &EventBus{pubsub: pubsub}
 	b.BaseService = *cmn.NewBaseService(nil, "EventBus", b)
@@ -60,11 +65,13 @@ func (b *EventBus) UnsubscribeAll(ctx context.Context, subscriber string) error 
 }
 
 func (b *EventBus) Publish(eventType string, eventData TMEventData) error {
-
+	// no explicit deadline for publishing events
 	ctx := context.Background()
 	b.pubsub.PublishWithTags(ctx, eventData, tmpubsub.NewTagMap(map[string]interface{}{EventTypeKey: eventType}))
 	return nil
 }
+
+//--- block, tx, and vote events
 
 func (b *EventBus) PublishEventNewBlock(event EventDataNewBlock) error {
 	return b.Publish(EventNewBlock, event)
@@ -78,14 +85,18 @@ func (b *EventBus) PublishEventVote(event EventDataVote) error {
 	return b.Publish(EventVote, event)
 }
 
+// PublishEventTx publishes tx event with tags from Result. Note it will add
+// predefined tags (EventTypeKey, TxHashKey). Existing tags with the same names
+// will be overwritten.
 func (b *EventBus) PublishEventTx(event EventDataTx) error {
-
+	// no explicit deadline for publishing events
 	ctx := context.Background()
 
 	tags := make(map[string]interface{})
 
+	// validate and fill tags from tx result
 	for _, tag := range event.Result.Tags {
-
+		// basic validation
 		if len(tag.Key) == 0 {
 			b.Logger.Info("Got tag with an empty key (skipping)", "tag", tag, "tx", event.Tx)
 			continue
@@ -93,6 +104,7 @@ func (b *EventBus) PublishEventTx(event EventDataTx) error {
 		tags[string(tag.Key)] = string(tag.Value)
 	}
 
+	// add predefined tags
 	logIfTagExists(EventTypeKey, tags, b.Logger)
 	tags[EventTypeKey] = EventTx
 
@@ -109,6 +121,8 @@ func (b *EventBus) PublishEventTx(event EventDataTx) error {
 func (b *EventBus) PublishEventProposalHeartbeat(event EventDataProposalHeartbeat) error {
 	return b.Publish(EventProposalHeartbeat, event)
 }
+
+//--- EventDataRoundState events
 
 func (b *EventBus) PublishEventNewRoundStep(event EventDataRoundState) error {
 	return b.Publish(EventNewRoundStep, event)

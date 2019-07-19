@@ -22,12 +22,15 @@ func ensureFiles(t *testing.T, rootDir string, files ...string) {
 func TestEnsureRoot(t *testing.T) {
 	require := require.New(t)
 
+	// setup temp dir for test
 	tmpDir, err := ioutil.TempDir("", "config-test")
 	require.Nil(err)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) // nolint: errcheck
 
+	// create root dir
 	EnsureRoot(tmpDir)
 
+	// make sure config is set properly
 	data, err := ioutil.ReadFile(filepath.Join(tmpDir, defaultConfigFilePath))
 	require.Nil(err)
 
@@ -43,9 +46,11 @@ func TestEnsureTestRoot(t *testing.T) {
 
 	testName := "ensureTestRoot"
 
+	// create root dir
 	cfg := ResetTestRoot(testName)
 	rootDir := cfg.RootDir
 
+	// make sure config is set properly
 	data, err := ioutil.ReadFile(filepath.Join(rootDir, defaultConfigFilePath))
 	require.Nil(err)
 
@@ -53,6 +58,7 @@ func TestEnsureTestRoot(t *testing.T) {
 		t.Fatalf("config file missing some information")
 	}
 
+	// TODO: make sure the cfg returned and testconfig are the same!
 	baseConfig := DefaultBaseConfig()
 	ensureFiles(t, rootDir, defaultDataDir, baseConfig.Genesis, baseConfig.PrivValidator)
 }
@@ -60,6 +66,7 @@ func TestEnsureTestRoot(t *testing.T) {
 func checkConfig(configFile string) bool {
 	var valid bool
 
+	// list of words we expect in the config
 	var elems = []string{
 		"moniker",
 		"seeds",

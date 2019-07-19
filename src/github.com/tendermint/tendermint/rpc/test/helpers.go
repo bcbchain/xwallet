@@ -17,8 +17,8 @@ import (
 	nm "github.com/tendermint/tendermint/node"
 	"github.com/tendermint/tendermint/proxy"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	core_grpc "github.com/tendermint/tendermint/rpc/grpc"
-	rpcclient "github.com/tendermint/tendermint/rpc/lib/client"
+	"github.com/tendermint/tendermint/rpc/grpc"
+	rpcclient "common/rpc/lib/client"
 	pvm "github.com/tendermint/tendermint/types/priv_validator"
 )
 
@@ -50,13 +50,14 @@ func waitForGRPC() {
 	}
 }
 
+// f**ing long, but unique for each test
 func makePathname() string {
-
+	// get path
 	p, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
-
+	// fmt.Println(p)
 	sep := string(filepath.Separator)
 	return strings.Replace(p, sep, "_", -1)
 }
@@ -72,16 +73,18 @@ func makeAddrs() (string, string, string) {
 		fmt.Sprintf("tcp://0.0.0.0:%d", start+2)
 }
 
+// GetConfig returns a config for the test cases as a singleton
 func GetConfig() *cfg.Config {
 	if globalConfig == nil {
 		pathname := makePathname()
 		globalConfig = cfg.ResetTestRoot(pathname)
 
+		// and we use random ports to run in parallel
 		tm, rpc, grpc := makeAddrs()
 		globalConfig.P2P.ListenAddress = tm
 		globalConfig.RPC.ListenAddress = rpc
 		globalConfig.RPC.GRPCListenAddress = grpc
-		globalConfig.TxIndex.IndexTags = "app.creator"
+		globalConfig.TxIndex.IndexTags = "app.creator" // see kvstore application
 	}
 	return globalConfig
 }
@@ -91,6 +94,7 @@ func GetGRPCClient() core_grpc.BroadcastAPIClient {
 	return core_grpc.StartGRPCClient(grpcAddr)
 }
 
+// StartTendermint starts a test tendermint server in a go routine and returns when it is initialized
 func StartTendermint(app abci.Application) *nm.Node {
 	node := NewTendermint(app)
 	err := node.Start()
@@ -98,6 +102,7 @@ func StartTendermint(app abci.Application) *nm.Node {
 		panic(err)
 	}
 
+	// wait for rpc
 	waitForRPC()
 	waitForGRPC()
 
@@ -106,11 +111,12 @@ func StartTendermint(app abci.Application) *nm.Node {
 	return node
 }
 
+// NewTendermint creates a new tendermint server and sleeps forever
 func NewTendermint(app abci.Application) *nm.Node {
-
+	// Create & start node
 	config := GetConfig()
-	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
-	logger = log.NewFilter(logger, log.AllowError())
+	logger := log.NewTMLogger("/tmp/111", "")
+	//logger = log.NewFilter(logger, log.AllowError())
 	pvFile := config.PrivValidatorFile()
 	pv := pvm.LoadOrGenFilePV(pvFile)
 	papp := proxy.NewLocalClientCreator(app)

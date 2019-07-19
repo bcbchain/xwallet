@@ -5,9 +5,22 @@ import (
 	"sort"
 )
 
+//----------------------------------------
+// KVPair
+
+/*
+Defined in types.proto
+
+type KVPair struct {
+	Key   []byte
+	Value []byte
+}
+*/
+
 type KVPairs []KVPair
 
-func (kvs KVPairs) Len() int	{ return len(kvs) }
+// Sorting
+func (kvs KVPairs) Len() int { return len(kvs) }
 func (kvs KVPairs) Less(i, j int) bool {
 	switch bytes.Compare(kvs[i].Key, kvs[j].Key) {
 	case -1:
@@ -20,12 +33,24 @@ func (kvs KVPairs) Less(i, j int) bool {
 		panic("invalid comparison result")
 	}
 }
-func (kvs KVPairs) Swap(i, j int)	{ kvs[i], kvs[j] = kvs[j], kvs[i] }
-func (kvs KVPairs) Sort()		{ sort.Sort(kvs) }
+func (kvs KVPairs) Swap(i, j int) { kvs[i], kvs[j] = kvs[j], kvs[i] }
+func (kvs KVPairs) Sort()         { sort.Sort(kvs) }
+
+//----------------------------------------
+// KI64Pair
+
+/*
+Defined in types.proto
+type KI64Pair struct {
+	Key   []byte
+	Value int64
+}
+*/
 
 type KI64Pairs []KI64Pair
 
-func (kvs KI64Pairs) Len() int	{ return len(kvs) }
+// Sorting
+func (kvs KI64Pairs) Len() int { return len(kvs) }
 func (kvs KI64Pairs) Less(i, j int) bool {
 	switch bytes.Compare(kvs[i].Key, kvs[j].Key) {
 	case -1:
@@ -38,5 +63,5 @@ func (kvs KI64Pairs) Less(i, j int) bool {
 		panic("invalid comparison result")
 	}
 }
-func (kvs KI64Pairs) Swap(i, j int)	{ kvs[i], kvs[j] = kvs[j], kvs[i] }
-func (kvs KI64Pairs) Sort()		{ sort.Sort(kvs) }
+func (kvs KI64Pairs) Swap(i, j int) { kvs[i], kvs[j] = kvs[j], kvs[i] }
+func (kvs KI64Pairs) Sort()         { sort.Sort(kvs) }

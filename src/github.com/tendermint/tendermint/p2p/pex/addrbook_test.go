@@ -38,6 +38,7 @@ func TestAddrBookPickAddress(t *testing.T) {
 	fname := createTempFileName("addrbook_test")
 	defer deleteTempFile(fname)
 
+	// 0 addresses
 	book := NewAddrBook(fname, true)
 	book.SetLogger(log.TestingLogger())
 	assert.Zero(t, book.Size())
@@ -49,6 +50,7 @@ func TestAddrBookPickAddress(t *testing.T) {
 	addrSrc := randAddrs[0]
 	book.AddAddress(addrSrc.addr, addrSrc.src)
 
+	// pick an address when we only have new address
 	addr = book.PickAddress(0)
 	assert.NotNil(t, addr, "expected an address")
 	addr = book.PickAddress(50)
@@ -56,12 +58,14 @@ func TestAddrBookPickAddress(t *testing.T) {
 	addr = book.PickAddress(100)
 	assert.NotNil(t, addr, "expected an address")
 
+	// pick an address when we only have old address
 	book.MarkGood(addrSrc.addr)
 	addr = book.PickAddress(0)
 	assert.NotNil(t, addr, "expected an address")
 	addr = book.PickAddress(50)
 	assert.NotNil(t, addr, "expected an address")
 
+	// in this case, nNew==0 but we biased 100% to new, so we return nil
 	addr = book.PickAddress(100)
 	assert.Nil(t, addr, "did not expected an address")
 }
@@ -70,6 +74,7 @@ func TestAddrBookSaveLoad(t *testing.T) {
 	fname := createTempFileName("addrbook_test")
 	defer deleteTempFile(fname)
 
+	// 0 addresses
 	book := NewAddrBook(fname, true)
 	book.SetLogger(log.TestingLogger())
 	book.saveToFile(fname)
@@ -80,6 +85,7 @@ func TestAddrBookSaveLoad(t *testing.T) {
 
 	assert.Zero(t, book.Size())
 
+	// 100 addresses
 	randAddrs := randNetAddressPairs(t, 100)
 
 	for _, addrSrc := range randAddrs {
@@ -130,15 +136,19 @@ func TestAddrBookPromoteToOld(t *testing.T) {
 		book.AddAddress(addrSrc.addr, addrSrc.src)
 	}
 
+	// Attempt all addresses.
 	for _, addrSrc := range randAddrs {
 		book.MarkAttempt(addrSrc.addr)
 	}
 
+	// Promote half of them
 	for i, addrSrc := range randAddrs {
 		if i%2 == 0 {
 			book.MarkGood(addrSrc.addr)
 		}
 	}
+
+	// TODO: do more testing :)
 
 	selection := book.GetSelection()
 	t.Logf("selection: %v", selection)
@@ -169,16 +179,16 @@ func TestAddrBookHandlesDuplicates(t *testing.T) {
 	differentSrc := randIPv4Address(t)
 	for _, addrSrc := range randAddrs {
 		book.AddAddress(addrSrc.addr, addrSrc.src)
-		book.AddAddress(addrSrc.addr, addrSrc.src)
-		book.AddAddress(addrSrc.addr, differentSrc)
+		book.AddAddress(addrSrc.addr, addrSrc.src)  // duplicate
+		book.AddAddress(addrSrc.addr, differentSrc) // different src
 	}
 
 	assert.Equal(t, 100, book.Size())
 }
 
 type netAddressPair struct {
-	addr	*p2p.NetAddress
-	src	*p2p.NetAddress
+	addr *p2p.NetAddress
+	src  *p2p.NetAddress
 }
 
 func randNetAddressPairs(t *testing.T, n int) []netAddressPair {
@@ -234,19 +244,23 @@ func TestAddrBookGetSelection(t *testing.T) {
 	book := NewAddrBook(fname, true)
 	book.SetLogger(log.TestingLogger())
 
+	// 1) empty book
 	assert.Empty(t, book.GetSelection())
 
+	// 2) add one address
 	addr := randIPv4Address(t)
 	book.AddAddress(addr, addr)
 
 	assert.Equal(t, 1, len(book.GetSelection()))
 	assert.Equal(t, addr, book.GetSelection()[0])
 
+	// 3) add a bunch of addresses
 	randAddrs := randNetAddressPairs(t, 100)
 	for _, addrSrc := range randAddrs {
 		book.AddAddress(addrSrc.addr, addrSrc.src)
 	}
 
+	// check there is no duplicates
 	addrs := make(map[string]*p2p.NetAddress)
 	selection := book.GetSelection()
 	for _, addr := range selection {
@@ -270,9 +284,11 @@ func TestAddrBookGetSelectionWithBias(t *testing.T) {
 	book := NewAddrBook(fname, true)
 	book.SetLogger(log.TestingLogger())
 
+	// 1) empty book
 	selection := book.GetSelectionWithBias(biasTowardsNewAddrs)
 	assert.Empty(t, selection)
 
+	// 2) add one address
 	addr := randIPv4Address(t)
 	book.AddAddress(addr, addr)
 
@@ -280,11 +296,13 @@ func TestAddrBookGetSelectionWithBias(t *testing.T) {
 	assert.Equal(t, 1, len(selection))
 	assert.Equal(t, addr, selection[0])
 
+	// 3) add a bunch of addresses
 	randAddrs := randNetAddressPairs(t, 100)
 	for _, addrSrc := range randAddrs {
 		book.AddAddress(addrSrc.addr, addrSrc.src)
 	}
 
+	// check there is no duplicates
 	addrs := make(map[string]*p2p.NetAddress)
 	selection = book.GetSelectionWithBias(biasTowardsNewAddrs)
 	for _, addr := range selection {
@@ -298,6 +316,7 @@ func TestAddrBookGetSelectionWithBias(t *testing.T) {
 		t.Fatalf("selection %v could not be bigger than the book", selection)
 	}
 
+	// 4) mark 80% of the addresses as good
 	randAddrsLen := len(randAddrs)
 	for i, addrSrc := range randAddrs {
 		if int((float64(i)/float64(randAddrsLen))*100) >= 20 {
@@ -307,6 +326,7 @@ func TestAddrBookGetSelectionWithBias(t *testing.T) {
 
 	selection = book.GetSelectionWithBias(biasTowardsNewAddrs)
 
+	// check that ~70% of addresses returned are good
 	good := 0
 	for _, addr := range selection {
 		if book.IsGood(addr) {

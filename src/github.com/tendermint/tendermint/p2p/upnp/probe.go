@@ -10,8 +10,8 @@ import (
 )
 
 type UPNPCapabilities struct {
-	PortMapping	bool
-	Hairpin		bool
+	PortMapping bool
+	Hairpin     bool
 }
 
 func makeUPNPListener(intPort int, extPort int, logger log.Logger) (NAT, net.Listener, net.IP, error) {
@@ -33,6 +33,7 @@ func makeUPNPListener(intPort int, extPort int, logger log.Logger) (NAT, net.Lis
 	}
 	logger.Info(cmn.Fmt("Port mapping mapped: %v", port))
 
+	// also run the listener, open for all remote addresses.
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%v", intPort))
 	if err != nil {
 		return nat, nil, ext, fmt.Errorf("Error establishing listener: %v", err)
@@ -41,7 +42,7 @@ func makeUPNPListener(intPort int, extPort int, logger log.Logger) (NAT, net.Lis
 }
 
 func testHairpin(listener net.Listener, extAddr string, logger log.Logger) (supportsHairpin bool) {
-
+	// Listener
 	go func() {
 		inConn, err := listener.Accept()
 		if err != nil {
@@ -62,6 +63,7 @@ func testHairpin(listener net.Listener, extAddr string, logger log.Logger) (supp
 		}
 	}()
 
+	// Establish outgoing
 	outConn, err := net.Dial("tcp", extAddr)
 	if err != nil {
 		logger.Info(cmn.Fmt("Outgoing connection dial error: %v", err))
@@ -75,6 +77,7 @@ func testHairpin(listener net.Listener, extAddr string, logger log.Logger) (supp
 	}
 	logger.Info(cmn.Fmt("Outgoing connection wrote %v bytes", n))
 
+	// Wait for data receipt
 	time.Sleep(1 * time.Second)
 	return
 }
@@ -90,6 +93,7 @@ func Probe(logger log.Logger) (caps UPNPCapabilities, err error) {
 	}
 	caps.PortMapping = true
 
+	// Deferred cleanup
 	defer func() {
 		if err := nat.DeletePortMapping("tcp", intPort, extPort); err != nil {
 			logger.Error(cmn.Fmt("Port mapping delete error: %v", err))

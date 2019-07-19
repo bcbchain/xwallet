@@ -18,6 +18,10 @@ func init() {
 	}
 }
 
+/****** these are for production settings ***********/
+
+// EnsureRoot creates the root, config, and data directories if they don't exist,
+// and panics if it fails.
 func EnsureRoot(rootDir string) {
 	if err := cmn.EnsureDir(rootDir, 0700); err != nil {
 		cmn.PanicSanity(err.Error())
@@ -31,15 +35,19 @@ func EnsureRoot(rootDir string) {
 
 	configFilePath := filepath.Join(rootDir, defaultConfigFilePath)
 
+	// Write default config file if missing.
 	if !cmn.FileExists(configFilePath) {
 		writeDefaultConfigFile(configFilePath)
 	}
 }
 
+// XXX: this func should probably be called by cmd/tendermint/commands/init.go
+// alongside the writing of the genesis.json and priv_validator.json
 func writeDefaultConfigFile(configFilePath string) {
 	WriteConfigFile(configFilePath, DefaultConfig())
 }
 
+// WriteConfigFile renders config using the template and writes it to configFilePath.
 func WriteConfigFile(configFilePath string, config *Config) {
 	var buffer bytes.Buffer
 
@@ -50,6 +58,8 @@ func WriteConfigFile(configFilePath string, config *Config) {
 	cmn.MustWriteFile(configFilePath, buffer.Bytes(), 0644)
 }
 
+// Note: any changes to the comments/variables/mapstructure
+// must be reflected in the appropriate struct in config/config.go
 const defaultConfigTemplate = `# This is a TOML config file.
 # For more information, see https://github.com/toml-lang/toml
 
@@ -235,22 +245,24 @@ index_tags = "{{ .TxIndex.IndexTags }}"
 index_all_tags = {{ .TxIndex.IndexAllTags }}
 `
 
+/****** these are for test settings ***********/
+
 func ResetTestRoot(testName string) *Config {
 	rootDir := os.ExpandEnv("$HOME/.tendermint_test")
 	rootDir = filepath.Join(rootDir, testName)
-
+	// Remove ~/.tendermint_test_bak
 	if cmn.FileExists(rootDir + "_bak") {
 		if err := os.RemoveAll(rootDir + "_bak"); err != nil {
 			cmn.PanicSanity(err.Error())
 		}
 	}
-
+	// Move ~/.tendermint_test to ~/.tendermint_test_bak
 	if cmn.FileExists(rootDir) {
 		if err := os.Rename(rootDir, rootDir+"_bak"); err != nil {
 			cmn.PanicSanity(err.Error())
 		}
 	}
-
+	// Create new dir
 	if err := cmn.EnsureDir(rootDir, 0700); err != nil {
 		cmn.PanicSanity(err.Error())
 	}
@@ -266,13 +278,14 @@ func ResetTestRoot(testName string) *Config {
 	genesisFilePath := filepath.Join(rootDir, baseConfig.Genesis)
 	privFilePath := filepath.Join(rootDir, baseConfig.PrivValidator)
 
+	// Write default config file if missing.
 	if !cmn.FileExists(configFilePath) {
 		writeDefaultConfigFile(configFilePath)
 	}
 	if !cmn.FileExists(genesisFilePath) {
 		cmn.MustWriteFile(genesisFilePath, []byte(testGenesis), 0644)
 	}
-
+	// we always overwrite the priv val
 	cmn.MustWriteFile(privFilePath, []byte(testPrivValidator), 0644)
 
 	config := TestConfig().SetRoot(rootDir)

@@ -4,7 +4,7 @@ import "testing"
 
 func mockDBWithStuff() DB {
 	db := NewMemDB()
-
+	// Under "key" prefix
 	db.Set(bz("key"), bz("value"))
 	db.Set(bz("key1"), bz("value1"))
 	db.Set(bz("key2"), bz("value2"))

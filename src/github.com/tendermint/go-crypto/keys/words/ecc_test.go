@@ -19,6 +19,7 @@ var codecs = []ECC{
 	NewECMACRC64(),
 }
 
+// TestECCPasses makes sure that the AddECC/CheckECC methods are symetric
 func TestECCPasses(t *testing.T) {
 	assert := asrt.New(t)
 
@@ -38,6 +39,7 @@ func TestECCPasses(t *testing.T) {
 	}
 }
 
+// TestECCFails makes sure random data will (usually) fail the checksum
 func TestECCFails(t *testing.T) {
 	assert := asrt.New(t)
 
@@ -54,7 +56,7 @@ func TestECCFails(t *testing.T) {
 				failed += 1
 			}
 		}
-
+		// we allow up to 1 falsely accepted checksums, as there are random matches
 		assert.InDelta(attempts, failed, 1, "%v", check)
 	}
 }

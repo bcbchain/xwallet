@@ -13,13 +13,13 @@ import (
 
 func main() {
 	if len(os.Args) == 1 {
-		fmt.Println(`Usage: aminoscan <STRUCT HEXBYTES>`)
+		fmt.Println(`Usage: aminoscan <STRUCT HEXBYTES>`) // TODO support more options, including support for framing.
 		return
 	}
-	bz := hexDecode(os.Args[1])
-	s, n, err := scanStruct(bz, "")
-	s += cmn.Red(fmt.Sprintf("%X", bz[n:]))
-	fmt.Println(s, n, err)
+	bz := hexDecode(os.Args[1])             // Read input hex bytes.
+	s, n, err := scanStruct(bz, "")         // Assume that it's  struct.
+	s += cmn.Red(fmt.Sprintf("%X", bz[n:])) // Bytes remaining are red.
+	fmt.Println(s, n, err)                  // Print color-encoded bytes s.
 }
 
 func scanAny(typ amino.Typ3, bz []byte, indent string) (term bool, s string, n int, err error) {
@@ -50,26 +50,26 @@ func scanVarint(bz []byte, indent string) (s string, n int, err error) {
 	if len(bz) == 0 {
 		err = fmt.Errorf("EOF reading Varint")
 	}
-
+	// First try Varint.
 	var i64, okI64 = int64(0), true
 	i64, n = binary.Varint(bz)
 	if n <= 0 {
 		n = 0
 		okI64 = false
 	}
-
+	// Then try Uvarint.
 	var u64, okU64, _n = uint64(0), true, int(0)
 	u64, _n = binary.Uvarint(bz)
 	if n != _n {
 		n = 0
 		okU64 = false
 	}
-
+	// If neither work, return error.
 	if !okI64 && !okU64 {
 		err = fmt.Errorf("Invalid (u)varint")
 		return
 	}
-
+	// s is the same either way.
 	s = cmn.Cyan(fmt.Sprintf("%X", bz[:n]))
 	fmt.Printf("%s%s (", indent, s)
 	if okI64 {
@@ -94,7 +94,7 @@ func scan8Byte(bz []byte, indent string) (s string, n int, err error) {
 }
 
 func scanByteLength(bz []byte, indent string) (s string, n int, err error) {
-
+	// Read the length.
 	var length, l64, _n = int(0), uint64(0), int(0)
 	l64, _n = binary.Uvarint(bz)
 	if n < 0 {
@@ -109,7 +109,7 @@ func scanByteLength(bz []byte, indent string) (s string, n int, err error) {
 	}
 	s = cmn.Cyan(fmt.Sprintf("%X", bz[:_n]))
 	slide(&bz, &n, _n)
-
+	// Read the remaining bytes.
 	s += cmn.Green(fmt.Sprintf("%X", bz[:length]))
 	slide(&bz, &n, length)
 	fmt.Printf("%s%s (%v bytes)\n", indent, s, length)
@@ -163,7 +163,7 @@ func scan4Byte(bz []byte, indent string) (s string, n int, err error) {
 }
 
 func scanList(bz []byte, indent string) (s string, n int, err error) {
-
+	// Read element Typ4.
 	if len(bz) < 1 {
 		err = errors.New("EOF reading list element typ4.")
 		return
@@ -176,7 +176,7 @@ func scanList(bz []byte, indent string) (s string, n int, err error) {
 	if slide(&bz, &n, 1) && err != nil {
 		return
 	}
-
+	// Read number of elements.
 	var num, _n = uint64(0), int(0)
 	num, _n = binary.Uvarint(bz)
 	if _n < 0 {
@@ -188,10 +188,10 @@ func scanList(bz []byte, indent string) (s string, n int, err error) {
 		return
 	}
 	fmt.Printf("%s%s of %v with %v items\n", indent, s, typ, num)
-
+	// Read elements.
 	var _s string
 	for i := 0; i < int(num); i++ {
-
+		// Maybe read nil byte.
 		if typ&0x08 != 0 {
 			if len(bz) == 0 {
 				err = errors.New("EOF reading list nil byte")
@@ -204,7 +204,7 @@ func scanList(bz []byte, indent string) (s string, n int, err error) {
 				s += "00"
 				fmt.Printf("%s00 (not nil)\n", indent)
 			case 0x01:
-				s += "01"
+				s += "01" // Is nil (NOTE: reverse logic)
 				fmt.Printf("%s01 (is nil)\n", indent)
 				continue
 			default:
@@ -212,7 +212,7 @@ func scanList(bz []byte, indent string) (s string, n int, err error) {
 				return
 			}
 		}
-
+		// Read element.
 		_, _s, _n, err = scanAny(typ.Typ3(), bz, indent+"  ")
 		if slide(&bz, &n, _n) && concat(&s, _s) && err != nil {
 			return
@@ -249,6 +249,9 @@ func scanInterface(bz []byte, indent string) (s string, n int, err error) {
 	}
 	return
 }
+
+//----------------------------------------
+// Misc.
 
 func slide(bzPtr *[]byte, n *int, _n int) bool {
 	if len(*bzPtr) < _n {

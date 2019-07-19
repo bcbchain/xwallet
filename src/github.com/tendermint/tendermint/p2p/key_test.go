@@ -22,6 +22,8 @@ func TestLoadOrGenNodeKey(t *testing.T) {
 	assert.Equal(t, nodeKey, nodeKey2)
 }
 
+//----------------------------------------------------------
+
 func padBytes(bz []byte, targetBytes int) []byte {
 	return append(bz, bytes.Repeat([]byte{0xFF}, targetBytes-len(bz))...)
 }
@@ -30,8 +32,8 @@ func TestPoWTarget(t *testing.T) {
 
 	targetBytes := 20
 	cases := []struct {
-		difficulty	uint
-		target		[]byte
+		difficulty uint
+		target     []byte
 	}{
 		{0, padBytes([]byte{}, targetBytes)},
 		{1, padBytes([]byte{127}, targetBytes)},

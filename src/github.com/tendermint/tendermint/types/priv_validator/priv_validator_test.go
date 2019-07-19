@@ -46,6 +46,7 @@ func TestLoadOrGenValidator(t *testing.T) {
 func TestUnmarshalValidator(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 
+	// create some fixed values
 	privKey := crypto.GenPrivKeyEd25519()
 	pubKey := privKey.PubKey()
 	addr := pubKey.Address()
@@ -75,10 +76,12 @@ func TestUnmarshalValidator(t *testing.T) {
 	err := cdc.UnmarshalJSON([]byte(serialized), &val)
 	require.Nil(err, "%+v", err)
 
+	// make sure the values match
 	assert.EqualValues(addr, val.GetAddress())
 	assert.EqualValues(pubKey, val.GetPubKey())
 	assert.EqualValues(privKey, val.PrivKey)
 
+	// export it and make sure it is the same
 	out, err := cdc.MarshalJSON(val)
 	require.Nil(err, "%+v", err)
 	assert.JSONEq(serialized, string(out))
@@ -95,18 +98,21 @@ func TestSignVote(t *testing.T) {
 	height, round := int64(10), 1
 	voteType := types.VoteTypePrevote
 
+	// sign a vote for first time
 	vote := newVote(privVal.Address, 0, height, round, voteType, block1)
 	err := privVal.SignVote("mychainid", vote)
 	assert.NoError(err, "expected no error signing vote")
 
+	// try to sign the same vote again; should be fine
 	err = privVal.SignVote("mychainid", vote)
 	assert.NoError(err, "expected no error on signing same vote")
 
+	// now try some bad votes
 	cases := []*types.Vote{
-		newVote(privVal.Address, 0, height, round-1, voteType, block1),
-		newVote(privVal.Address, 0, height-1, round, voteType, block1),
-		newVote(privVal.Address, 0, height-2, round+4, voteType, block1),
-		newVote(privVal.Address, 0, height, round, voteType, block2),
+		newVote(privVal.Address, 0, height, round-1, voteType, block1),   // round regression
+		newVote(privVal.Address, 0, height-1, round, voteType, block1),   // height regression
+		newVote(privVal.Address, 0, height-2, round+4, voteType, block1), // height regression and different round
+		newVote(privVal.Address, 0, height, round, voteType, block2),     // different block
 	}
 
 	for _, c := range cases {
@@ -114,6 +120,7 @@ func TestSignVote(t *testing.T) {
 		assert.Error(err, "expected error on signing conflicting vote")
 	}
 
+	// try signing a vote with a different time stamp
 	sig := vote.Signature
 	vote.Timestamp = vote.Timestamp.Add(time.Duration(1000))
 	err = privVal.SignVote("mychainid", vote)
@@ -131,18 +138,21 @@ func TestSignProposal(t *testing.T) {
 	block2 := types.PartSetHeader{10, []byte{3, 2, 1}}
 	height, round := int64(10), 1
 
+	// sign a proposal for first time
 	proposal := newProposal(height, round, block1)
 	err := privVal.SignProposal("mychainid", proposal)
 	assert.NoError(err, "expected no error signing proposal")
 
+	// try to sign the same proposal again; should be fine
 	err = privVal.SignProposal("mychainid", proposal)
 	assert.NoError(err, "expected no error on signing same proposal")
 
+	// now try some bad Proposals
 	cases := []*types.Proposal{
-		newProposal(height, round-1, block1),
-		newProposal(height-1, round, block1),
-		newProposal(height-2, round+4, block1),
-		newProposal(height, round, block2),
+		newProposal(height, round-1, block1),   // round regression
+		newProposal(height-1, round, block1),   // height regression
+		newProposal(height-2, round+4, block1), // height regression and different round
+		newProposal(height, round, block2),     // different block
 	}
 
 	for _, c := range cases {
@@ -150,6 +160,7 @@ func TestSignProposal(t *testing.T) {
 		assert.Error(err, "expected error on signing conflicting proposal")
 	}
 
+	// try signing a proposal with a different time stamp
 	sig := proposal.Signature
 	proposal.Timestamp = proposal.Timestamp.Add(time.Duration(1000))
 	err = privVal.SignProposal("mychainid", proposal)
@@ -165,6 +176,7 @@ func TestDifferByTimestamp(t *testing.T) {
 	height, round := int64(10), 1
 	chainID := "mychainid"
 
+	// test proposal
 	{
 		proposal := newProposal(height, round, block1)
 		err := privVal.SignProposal(chainID, proposal)
@@ -173,6 +185,7 @@ func TestDifferByTimestamp(t *testing.T) {
 		sig := proposal.Signature
 		timeStamp := clipToMS(proposal.Timestamp)
 
+		// manipulate the timestamp. should get changed back
 		proposal.Timestamp = proposal.Timestamp.Add(time.Millisecond)
 		var emptySig crypto.Signature
 		proposal.Signature = emptySig
@@ -184,6 +197,7 @@ func TestDifferByTimestamp(t *testing.T) {
 		assert.Equal(t, sig, proposal.Signature)
 	}
 
+	// test vote
 	{
 		voteType := types.VoteTypePrevote
 		blockID := types.BlockID{[]byte{1, 2, 3}, types.PartSetHeader{}}
@@ -195,6 +209,7 @@ func TestDifferByTimestamp(t *testing.T) {
 		sig := vote.Signature
 		timeStamp := clipToMS(vote.Timestamp)
 
+		// manipulate the timestamp. should get changed back
 		vote.Timestamp = vote.Timestamp.Add(time.Millisecond)
 		var emptySig crypto.Signature
 		vote.Signature = emptySig
@@ -207,24 +222,24 @@ func TestDifferByTimestamp(t *testing.T) {
 	}
 }
 
-func newVote(addr types.Address, idx int, height int64, round int, typ byte, blockID types.BlockID) *types.Vote {
+func newVote(addr crypto.Address, idx int, height int64, round int, typ byte, blockID types.BlockID) *types.Vote {
 	return &types.Vote{
-		ValidatorAddress:	addr,
-		ValidatorIndex:		idx,
-		Height:			height,
-		Round:			round,
-		Type:			typ,
-		Timestamp:		time.Now().UTC(),
-		BlockID:		blockID,
+		ValidatorAddress: addr,
+		ValidatorIndex:   idx,
+		Height:           height,
+		Round:            round,
+		Type:             typ,
+		Timestamp:        time.Now().UTC(),
+		BlockID:          blockID,
 	}
 }
 
 func newProposal(height int64, round int, partsHeader types.PartSetHeader) *types.Proposal {
 	return &types.Proposal{
-		Height:			height,
-		Round:			round,
-		BlockPartsHeader:	partsHeader,
-		Timestamp:		time.Now().UTC(),
+		Height:           height,
+		Round:            round,
+		BlockPartsHeader: partsHeader,
+		Timestamp:        time.Now().UTC(),
 	}
 }
 

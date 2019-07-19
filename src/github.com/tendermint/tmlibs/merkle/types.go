@@ -9,7 +9,7 @@ type Tree interface {
 	Size() (size int)
 	Height() (height int8)
 	Has(key []byte) (has bool)
-	Proof(key []byte) (value []byte, proof []byte, exists bool)
+	Proof(key []byte) (value []byte, proof []byte, exists bool) // TODO make it return an index
 	Get(key []byte) (index int, value []byte, exists bool)
 	GetByIndex(index int) (key []byte, value []byte)
 	Set(key []byte, value []byte) (updated bool)
@@ -26,6 +26,9 @@ type Tree interface {
 type Hasher interface {
 	Hash() []byte
 }
+
+//-----------------------------------------------------------------------
+// NOTE: these are duplicated from go-amino so we dont need go-amino as a dep
 
 func encodeByteSlice(w io.Writer, bz []byte) (err error) {
 	err = encodeUvarint(w, uint64(len(bz)))

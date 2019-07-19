@@ -11,17 +11,18 @@ import (
 func TestEncoders(t *testing.T) {
 	assert := assert.New(t)
 
+	// TODO: also test other alphabets???
 	btc := base58.BTCEncoder
 
 	cases := []struct {
-		encoder		data.ByteEncoder
-		input, expected	[]byte
+		encoder         data.ByteEncoder
+		input, expected []byte
 	}{
 		{btc, []byte(`"3mJr7AoUXx2Wqd"`), []byte("1234598760")},
 		{btc, []byte(`"3yxU3u1igY8WkgtjK92fbJQCd4BZiiT1v25f"`), []byte("abcdefghijklmnopqrstuvwxyz")},
-
-		{btc, []byte(`0123`), nil},
-		{btc, []byte(`"3mJr0"`), nil},
+		// these are errors
+		{btc, []byte(`0123`), nil},    // not in quotes
+		{btc, []byte(`"3mJr0"`), nil}, // invalid chars
 	}
 
 	for _, tc := range cases {

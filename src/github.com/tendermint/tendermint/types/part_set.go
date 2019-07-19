@@ -14,16 +14,17 @@ import (
 )
 
 var (
-	ErrPartSetUnexpectedIndex	= errors.New("Error part set unexpected index")
-	ErrPartSetInvalidProof		= errors.New("Error part set invalid proof")
+	ErrPartSetUnexpectedIndex = errors.New("Error part set unexpected index")
+	ErrPartSetInvalidProof    = errors.New("Error part set invalid proof")
 )
 
 type Part struct {
-	Index	int			`json:"index"`
-	Bytes	cmn.HexBytes		`json:"bytes"`
-	Proof	merkle.SimpleProof	`json:"proof"`
+	Index int                `json:"index"`
+	Bytes cmn.HexBytes       `json:"bytes"`
+	Proof merkle.SimpleProof `json:"proof"`
 
-	hash	[]byte
+	// Cache
+	hash []byte
 }
 
 func (part *Part) Hash() []byte {
@@ -31,7 +32,7 @@ func (part *Part) Hash() []byte {
 		return part.hash
 	}
 	hasher := ripemd160.New()
-	hasher.Write(part.Bytes)
+	hasher.Write(part.Bytes) // nolint: errcheck, gas
 	part.hash = hasher.Sum(nil)
 	return part.hash
 }
@@ -51,9 +52,11 @@ func (part *Part) StringIndented(indent string) string {
 		indent)
 }
 
+//-------------------------------------
+
 type PartSetHeader struct {
-	Total	int		`json:"total"`
-	Hash	cmn.HexBytes	`json:"hash"`
+	Total int          `json:"total"`
+	Hash  cmn.HexBytes `json:"hash"`
 }
 
 func (psh PartSetHeader) String() string {
@@ -68,52 +71,57 @@ func (psh PartSetHeader) Equals(other PartSetHeader) bool {
 	return psh.Total == other.Total && bytes.Equal(psh.Hash, other.Hash)
 }
 
-type PartSet struct {
-	total	int
-	hash	[]byte
+//-------------------------------------
 
-	mtx		sync.Mutex
-	parts		[]*Part
-	partsBitArray	*cmn.BitArray
-	count		int
+type PartSet struct {
+	total int
+	hash  []byte
+
+	mtx           sync.Mutex
+	parts         []*Part
+	partsBitArray *cmn.BitArray
+	count         int
 }
 
+// Returns an immutable, full PartSet from the data bytes.
+// The data bytes are split into "partSize" chunks, and merkle tree computed.
 func NewPartSetFromData(data []byte, partSize int) *PartSet {
-
+	// divide data into 4kb parts.
 	total := (len(data) + partSize - 1) / partSize
 	parts := make([]*Part, total)
 	parts_ := make([]merkle.Hasher, total)
 	partsBitArray := cmn.NewBitArray(total)
 	for i := 0; i < total; i++ {
 		part := &Part{
-			Index:	i,
-			Bytes:	data[i*partSize : cmn.MinInt(len(data), (i+1)*partSize)],
+			Index: i,
+			Bytes: data[i*partSize : cmn.MinInt(len(data), (i+1)*partSize)],
 		}
 		parts[i] = part
 		parts_[i] = part
 		partsBitArray.SetIndex(i, true)
 	}
-
+	// Compute merkle proofs
 	root, proofs := merkle.SimpleProofsFromHashers(parts_)
 	for i := 0; i < total; i++ {
 		parts[i].Proof = *proofs[i]
 	}
 	return &PartSet{
-		total:		total,
-		hash:		root,
-		parts:		parts,
-		partsBitArray:	partsBitArray,
-		count:		total,
+		total:         total,
+		hash:          root,
+		parts:         parts,
+		partsBitArray: partsBitArray,
+		count:         total,
 	}
 }
 
+// Returns an empty PartSet ready to be populated.
 func NewPartSetFromHeader(header PartSetHeader) *PartSet {
 	return &PartSet{
-		total:		header.Total,
-		hash:		header.Hash,
-		parts:		make([]*Part, header.Total),
-		partsBitArray:	cmn.NewBitArray(header.Total),
-		count:		0,
+		total:         header.Total,
+		hash:          header.Hash,
+		parts:         make([]*Part, header.Total),
+		partsBitArray: cmn.NewBitArray(header.Total),
+		count:         0,
 	}
 }
 
@@ -122,8 +130,8 @@ func (ps *PartSet) Header() PartSetHeader {
 		return PartSetHeader{}
 	}
 	return PartSetHeader{
-		Total:	ps.total,
-		Hash:	ps.hash,
+		Total: ps.total,
+		Hash:  ps.hash,
 	}
 }
 
@@ -172,20 +180,24 @@ func (ps *PartSet) AddPart(part *Part, verify bool) (bool, error) {
 	ps.mtx.Lock()
 	defer ps.mtx.Unlock()
 
+	// Invalid part index
 	if part.Index >= ps.total {
 		return false, ErrPartSetUnexpectedIndex
 	}
 
+	// If part already exists, return false.
 	if ps.parts[part.Index] != nil {
 		return false, nil
 	}
 
+	// Check hash proof
 	if verify {
 		if !part.Proof.Verify(part.Index, ps.total, part.Hash(), ps.Hash()) {
 			return false, ErrPartSetInvalidProof
 		}
 	}
 
+	// Add part
 	ps.parts[part.Index] = part
 	ps.partsBitArray.SetIndex(part.Index, true)
 	ps.count++
@@ -210,16 +222,16 @@ func (ps *PartSet) GetReader() io.Reader {
 }
 
 type PartSetReader struct {
-	i	int
-	parts	[]*Part
-	reader	*bytes.Reader
+	i      int
+	parts  []*Part
+	reader *bytes.Reader
 }
 
 func NewPartSetReader(parts []*Part) *PartSetReader {
 	return &PartSetReader{
-		i:	0,
-		parts:	parts,
-		reader:	bytes.NewReader(parts[0].Bytes),
+		i:      0,
+		parts:  parts,
+		reader: bytes.NewReader(parts[0].Bytes),
 	}
 }
 
@@ -262,8 +274,8 @@ func (ps *PartSet) MarshalJSON() ([]byte, error) {
 	defer ps.mtx.Unlock()
 
 	return cdc.MarshalJSON(struct {
-		CountTotal	string		`json:"count/total"`
-		PartsBitArray	*cmn.BitArray	`json:"parts_bit_array"`
+		CountTotal    string        `json:"count/total"`
+		PartsBitArray *cmn.BitArray `json:"parts_bit_array"`
 	}{
 		fmt.Sprintf("%d/%d", ps.Count(), ps.Total()),
 		ps.partsBitArray,

@@ -11,10 +11,10 @@ import (
 
 func TestWriteFileAtomic(t *testing.T) {
 	var (
-		seed			= rand.New(rand.NewSource(time.Now().UnixNano()))
-		data			= []byte(RandStr(seed.Intn(2048)))
-		old			= RandBytes(seed.Intn(2048))
-		perm	os.FileMode	= 0600
+		seed             = rand.New(rand.NewSource(time.Now().UnixNano()))
+		data             = []byte(RandStr(seed.Intn(2048)))
+		old              = RandBytes(seed.Intn(2048))
+		perm os.FileMode = 0600
 	)
 
 	f, err := ioutil.TempFile("/tmp", "write-atomic-test-")
@@ -51,7 +51,7 @@ func TestWriteFileAtomic(t *testing.T) {
 }
 
 func TestGoPath(t *testing.T) {
-
+	// restore original gopath upon exit
 	path := os.Getenv("GOPATH")
 	defer func() {
 		_ = os.Setenv("GOPATH", path)
@@ -74,14 +74,14 @@ func TestGoPath(t *testing.T) {
 }
 
 func TestGoPathWithoutEnvVar(t *testing.T) {
-
+	// restore original gopath upon exit
 	path := os.Getenv("GOPATH")
 	defer func() {
 		_ = os.Setenv("GOPATH", path)
 	}()
 
 	os.Unsetenv("GOPATH")
-
+	// reset cache
 	gopath = ""
 
 	path = GoPath()

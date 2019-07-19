@@ -7,9 +7,11 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+/* Loading & Saving */
+
 type addrBookJSON struct {
-	Key	string		`json:"key"`
-	Addrs	[]*knownAddress	`json:"addrs"`
+	Key   string          `json:"key"`
+	Addrs []*knownAddress `json:"addrs"`
 }
 
 func (a *addrBook) saveToFile(filePath string) {
@@ -17,15 +19,15 @@ func (a *addrBook) saveToFile(filePath string) {
 
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
-
+	// Compile Addrs
 	addrs := []*knownAddress{}
 	for _, ka := range a.addrLookup {
 		addrs = append(addrs, ka)
 	}
 
 	aJSON := &addrBookJSON{
-		Key:	a.key,
-		Addrs:	addrs,
+		Key:   a.key,
+		Addrs: addrs,
 	}
 
 	jsonBytes, err := json.MarshalIndent(aJSON, "", "\t")
@@ -39,18 +41,21 @@ func (a *addrBook) saveToFile(filePath string) {
 	}
 }
 
+// Returns false if file does not exist.
+// cmn.Panics if file is corrupt.
 func (a *addrBook) loadFromFile(filePath string) bool {
-
+	// If doesn't exist, do nothing.
 	_, err := os.Stat(filePath)
 	if os.IsNotExist(err) {
 		return false
 	}
 
+	// Load addrBookJSON{}
 	r, err := os.Open(filePath)
 	if err != nil {
 		cmn.PanicCrisis(cmn.Fmt("Error opening file %s: %v", filePath, err))
 	}
-	defer r.Close()
+	defer r.Close() // nolint: errcheck
 	aJSON := &addrBookJSON{}
 	dec := json.NewDecoder(r)
 	err = dec.Decode(aJSON)
@@ -58,8 +63,10 @@ func (a *addrBook) loadFromFile(filePath string) bool {
 		cmn.PanicCrisis(cmn.Fmt("Error reading file %s: %v", filePath, err))
 	}
 
+	// Restore all the fields...
+	// Restore the key
 	a.key = aJSON.Key
-
+	// Restore .bucketsNew & .bucketsOld
 	for _, ka := range aJSON.Addrs {
 		for _, bucketIndex := range ka.Buckets {
 			bucket := a.getBucket(ka.BucketType, bucketIndex)

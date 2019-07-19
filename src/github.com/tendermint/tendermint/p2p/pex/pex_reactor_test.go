@@ -62,13 +62,15 @@ func TestPEXReactorRunning(t *testing.T) {
 	N := 3
 	switches := make([]*p2p.Switch, N)
 
+	// directory to store address books
 	dir, err := ioutil.TempDir("", "pex_reactor")
 	require.Nil(t, err)
-	defer os.RemoveAll(dir)
+	defer os.RemoveAll(dir) // nolint: errcheck
 
 	books := make([]*addrBook, N)
 	logger := log.TestingLogger()
 
+	// create switches
 	for i := 0; i < N; i++ {
 		switches[i] = p2p.MakeSwitch(config, i, "127.0.0.1", "123.123.123", func(i int, sw *p2p.Switch) *p2p.Switch {
 			books[i] = NewAddrBook(filepath.Join(dir, fmt.Sprintf("addrbook%d.json", i)), false)
@@ -98,12 +100,13 @@ func TestPEXReactorRunning(t *testing.T) {
 	for i, sw := range switches {
 		sw.AddListener(p2p.NewDefaultListener("tcp", sw.NodeInfo().ListenAddr, true, logger.With("pex", i)))
 
-		err := sw.Start()
+		err := sw.Start() // start switch and reactors
 		require.Nil(t, err)
 	}
 
 	assertPeersWithTimeout(t, switches, 10*time.Millisecond, 10*time.Second, N-1)
 
+	// stop them
 	for _, s := range switches {
 		s.Stop()
 	}
@@ -115,6 +118,7 @@ func TestPEXReactorReceive(t *testing.T) {
 
 	peer := p2p.CreateRandomPeer(false)
 
+	// we have to send a request to receive responses
 	r.RequestAddrs(peer)
 
 	size := book.Size()
@@ -124,7 +128,7 @@ func TestPEXReactorReceive(t *testing.T) {
 	assert.Equal(t, size+1, book.Size())
 
 	msg = cdc.MustMarshalBinary(&pexRequestMessage{})
-	r.Receive(PexChannel, peer, msg)
+	r.Receive(PexChannel, peer, msg) // should not panic.
 }
 
 func TestPEXReactorRequestMessageAbuse(t *testing.T) {
@@ -141,14 +145,17 @@ func TestPEXReactorRequestMessageAbuse(t *testing.T) {
 	id := string(peer.ID())
 	msg := cdc.MustMarshalBinary(&pexRequestMessage{})
 
+	// first time creates the entry
 	r.Receive(PexChannel, peer, msg)
 	assert.True(t, r.lastReceivedRequests.Has(id))
 	assert.True(t, sw.Peers().Has(peer.ID()))
 
+	// next time sets the last time value
 	r.Receive(PexChannel, peer, msg)
 	assert.True(t, r.lastReceivedRequests.Has(id))
 	assert.True(t, sw.Peers().Has(peer.ID()))
 
+	// third time is too many too soon - peer is removed
 	r.Receive(PexChannel, peer, msg)
 	assert.False(t, r.lastReceivedRequests.Has(id))
 	assert.False(t, sw.Peers().Has(peer.ID()))
@@ -167,6 +174,7 @@ func TestPEXReactorAddrsMessageAbuse(t *testing.T) {
 
 	id := string(peer.ID())
 
+	// request addrs from the peer
 	r.RequestAddrs(peer)
 	assert.True(t, r.requestsSent.Has(id))
 	assert.True(t, sw.Peers().Has(peer.ID()))
@@ -174,20 +182,23 @@ func TestPEXReactorAddrsMessageAbuse(t *testing.T) {
 	addrs := []*p2p.NetAddress{peer.NodeInfo().NetAddress()}
 	msg := cdc.MustMarshalBinary(&pexAddrsMessage{Addrs: addrs})
 
+	// receive some addrs. should clear the request
 	r.Receive(PexChannel, peer, msg)
 	assert.False(t, r.requestsSent.Has(id))
 	assert.True(t, sw.Peers().Has(peer.ID()))
 
+	// receiving more addrs causes a disconnect
 	r.Receive(PexChannel, peer, msg)
 	assert.False(t, sw.Peers().Has(peer.ID()))
 }
 
 func TestPEXReactorUsesSeedsIfNeeded(t *testing.T) {
-
+	// directory to store address books
 	dir, err := ioutil.TempDir("", "pex_reactor")
 	require.Nil(t, err)
-	defer os.RemoveAll(dir)
+	defer os.RemoveAll(dir) // nolint: errcheck
 
+	// 1. create seed
 	seed := p2p.MakeSwitch(
 		config,
 		0,
@@ -217,6 +228,7 @@ func TestPEXReactorUsesSeedsIfNeeded(t *testing.T) {
 	require.Nil(t, seed.Start())
 	defer seed.Stop()
 
+	// 2. create usual peer with only seed configured.
 	peer := p2p.MakeSwitch(
 		config,
 		1,
@@ -243,6 +255,7 @@ func TestPEXReactorUsesSeedsIfNeeded(t *testing.T) {
 	require.Nil(t, peer.Start())
 	defer peer.Stop()
 
+	// 3. check that the peer connects to seed immediately
 	assertPeersWithTimeout(t, []*p2p.Switch{peer}, 10*time.Millisecond, 3*time.Second, 1)
 }
 
@@ -250,21 +263,27 @@ func TestPEXReactorCrawlStatus(t *testing.T) {
 	pexR, book := createReactor(&PEXReactorConfig{SeedMode: true})
 	defer teardownReactor(book)
 
+	// Seed/Crawler mode uses data from the Switch
 	sw := createSwitchAndAddReactors(pexR)
 	sw.SetAddrBook(book)
 
+	// Create a peer, add it to the peer set and the addrbook.
 	peer := p2p.CreateRandomPeer(false)
 	p2p.AddPeerToSwitch(pexR.Switch, peer)
 	addr1 := peer.NodeInfo().NetAddress()
 	pexR.book.AddAddress(addr1, addr1)
 
+	// Add a non-connected address to the book.
 	_, addr2 := p2p.CreateRoutableAddr()
 	pexR.book.AddAddress(addr2, addr1)
 
+	// Get some peerInfos to crawl
 	peerInfos := pexR.getPeersToCrawl()
 
+	// Make sure it has the proper number of elements
 	assert.Equal(t, 2, len(peerInfos))
 
+	// TODO: test
 }
 
 func TestPEXReactorDoesNotAddPrivatePeersToAddrBook(t *testing.T) {
@@ -273,6 +292,7 @@ func TestPEXReactorDoesNotAddPrivatePeersToAddrBook(t *testing.T) {
 	pexR, book := createReactor(&PEXReactorConfig{PrivatePeerIDs: []string{string(peer.NodeInfo().ID)}})
 	defer teardownReactor(book)
 
+	// we have to send a request to receive responses
 	pexR.RequestAddrs(peer)
 
 	size := book.Size()
@@ -297,17 +317,21 @@ func TestPEXReactorDialPeer(t *testing.T) {
 
 	assert.Equal(t, 0, pexR.AttemptsToDial(addr))
 
+	// 1st unsuccessful attempt
 	pexR.dialPeer(addr)
 
 	assert.Equal(t, 1, pexR.AttemptsToDial(addr))
 
+	// 2nd unsuccessful attempt
 	pexR.dialPeer(addr)
 
+	// must be skipped because it is too early
 	assert.Equal(t, 1, pexR.AttemptsToDial(addr))
 
 	if !testing.Short() {
 		time.Sleep(3 * time.Second)
 
+		// 3rd attempt
 		pexR.dialPeer(addr)
 
 		assert.Equal(t, 2, pexR.AttemptsToDial(addr))
@@ -316,36 +340,36 @@ func TestPEXReactorDialPeer(t *testing.T) {
 
 type mockPeer struct {
 	*cmn.BaseService
-	pubKey			crypto.PubKey
-	addr			*p2p.NetAddress
-	outbound, persistent	bool
+	pubKey               crypto.PubKey
+	addr                 *p2p.NetAddress
+	outbound, persistent bool
 }
 
 func newMockPeer() mockPeer {
 	_, netAddr := p2p.CreateRoutableAddr()
 	mp := mockPeer{
-		addr:	netAddr,
-		pubKey:	crypto.GenPrivKeyEd25519().PubKey(),
+		addr:   netAddr,
+		pubKey: crypto.GenPrivKeyEd25519().PubKey(),
 	}
 	mp.BaseService = cmn.NewBaseService(nil, "MockPeer", mp)
 	mp.Start()
 	return mp
 }
 
-func (mp mockPeer) ID() p2p.ID		{ return mp.addr.ID }
-func (mp mockPeer) IsOutbound() bool	{ return mp.outbound }
-func (mp mockPeer) IsPersistent() bool	{ return mp.persistent }
+func (mp mockPeer) ID() p2p.ID         { return mp.addr.ID }
+func (mp mockPeer) IsOutbound() bool   { return mp.outbound }
+func (mp mockPeer) IsPersistent() bool { return mp.persistent }
 func (mp mockPeer) NodeInfo() p2p.NodeInfo {
 	return p2p.NodeInfo{
-		ID:		mp.addr.ID,
-		ListenAddr:	mp.addr.DialString(),
+		ID:         mp.addr.ID,
+		ListenAddr: mp.addr.DialString(),
 	}
 }
-func (mp mockPeer) Status() conn.ConnectionStatus	{ return conn.ConnectionStatus{} }
-func (mp mockPeer) Send(byte, []byte) bool		{ return false }
-func (mp mockPeer) TrySend(byte, []byte) bool		{ return false }
-func (mp mockPeer) Set(string, interface{})		{}
-func (mp mockPeer) Get(string) interface{}		{ return nil }
+func (mp mockPeer) Status() conn.ConnectionStatus { return conn.ConnectionStatus{} }
+func (mp mockPeer) Send(byte, []byte) bool        { return false }
+func (mp mockPeer) TrySend(byte, []byte) bool     { return false }
+func (mp mockPeer) Set(string, interface{})       {}
+func (mp mockPeer) Get(string) interface{}        { return nil }
 
 func assertPeersWithTimeout(
 	t *testing.T,
@@ -354,14 +378,14 @@ func assertPeersWithTimeout(
 	nPeers int,
 ) {
 	var (
-		ticker		= time.NewTicker(checkPeriod)
-		remaining	= timeout
+		ticker    = time.NewTicker(checkPeriod)
+		remaining = timeout
 	)
 
 	for {
 		select {
 		case <-ticker.C:
-
+			// check peers are connected
 			allGood := true
 			for _, s := range switches {
 				outbound, inbound, _ := s.NumPeers()
@@ -392,7 +416,7 @@ func assertPeersWithTimeout(
 }
 
 func createReactor(config *PEXReactorConfig) (r *PEXReactor, book *addrBook) {
-
+	// directory to store address book
 	dir, err := ioutil.TempDir("", "pex_reactor")
 	if err != nil {
 		panic(err)

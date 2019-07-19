@@ -1,3 +1,7 @@
+// Copyright 2012 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package ed25519
 
 import (
@@ -56,7 +60,8 @@ func TestSignVerify(t *testing.T) {
 }
 
 func TestGolden(t *testing.T) {
-
+	// sign.input.gz is a selection of test cases from
+	// http://ed25519.cr.yp.to/python/sign.input
 	testDataZ, err := os.Open("testdata/sign.input.gz")
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +98,8 @@ func TestGolden(t *testing.T) {
 		pubKeyBytes, _ := hex.DecodeString(parts[1])
 		msg, _ := hex.DecodeString(parts[2])
 		sig, _ := hex.DecodeString(parts[3])
-
+		// The signatures in the test vectors also include the message
+		// at the end, but we just want R and S.
 		sig = sig[:SignatureSize]
 
 		if l := len(pubKeyBytes); l != PublicKeySize {

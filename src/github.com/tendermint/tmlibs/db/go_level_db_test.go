@@ -27,26 +27,26 @@ func BenchmarkRandomReadsWrites(b *testing.B) {
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-
+		// Write something
 		{
 			idx := (int64(cmn.RandInt()) % numItems)
 			internal[idx]++
 			val := internal[idx]
 			idxBytes := int642Bytes(int64(idx))
 			valBytes := int642Bytes(int64(val))
-
+			//fmt.Printf("Set %X -> %X\n", idxBytes, valBytes)
 			db.Set(
 				idxBytes,
 				valBytes,
 			)
 		}
-
+		// Read something
 		{
 			idx := (int64(cmn.RandInt()) % numItems)
 			val := internal[idx]
 			idxBytes := int642Bytes(int64(idx))
 			valBytes := db.Get(idxBytes)
-
+			//fmt.Printf("Get %X -> %X\n", idxBytes, valBytes)
 			if val == 0 {
 				if !bytes.Equal(valBytes, nil) {
 					b.Errorf("Expected %v for %v, got %X",

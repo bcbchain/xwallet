@@ -5,47 +5,47 @@ import (
 )
 
 type (
-	ErrInvalidBlock	error
-	ErrProxyAppConn	error
+	ErrInvalidBlock error
+	ErrProxyAppConn error
 
-	ErrUnknownBlock	struct {
+	ErrUnknownBlock struct {
 		Height int64
 	}
 
-	ErrBlockHashMismatch	struct {
-		CoreHash	[]byte
-		AppHash		[]byte
-		Height		int64
+	ErrBlockHashMismatch struct {
+		CoreHash []byte
+		AppHash  []byte
+		Height   int64
 	}
 
-	ErrAppBlockHeightTooHigh	struct {
-		CoreHeight	int64
-		AppHeight	int64
+	ErrAppBlockHeightTooHigh struct {
+		CoreHeight int64
+		AppHeight  int64
 	}
 
-	ErrLastStateMismatch	struct {
-		Height	int64
-		Core	[]byte
-		App	[]byte
+	ErrLastStateMismatch struct {
+		Height int64
+		Core   []byte
+		App    []byte
 	}
 
-	ErrStateMismatch	struct {
-		Got		*State
-		Expected	*State
+	ErrStateMismatch struct {
+		Got      *State
+		Expected *State
 	}
 
-	ErrNoValSetForHeight	struct {
+	ErrNoValSetForHeight struct {
 		Height int64
 	}
 
-	ErrNoConsensusParamsForHeight	struct {
+	ErrNoConsensusParamsForHeight struct {
 		Height int64
 	}
 
-	ErrNoABCIResponsesForHeight	struct {
+	ErrNoABCIResponsesForHeight struct {
 		Height int64
 	}
-	ErrNoABCITxResponseForTxHash	struct {
+	ErrNoABCITxResponseForTxHash struct {
 		TxHash []byte
 	}
 )

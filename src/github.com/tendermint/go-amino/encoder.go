@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+//----------------------------------------
+// Signed
+
 func EncodeInt8(w io.Writer, i int8) (err error) {
 	return EncodeVarint(w, int64(i))
 }
@@ -41,6 +44,9 @@ func VarintSize(i int64) int {
 	n := binary.PutVarint(buf[:], i)
 	return n
 }
+
+//----------------------------------------
+// Unsigned
 
 func EncodeByte(w io.Writer, b byte) (err error) {
 	return EncodeUvarint(w, uint64(b))
@@ -81,26 +87,38 @@ func UvarintSize(u uint64) int {
 	return n
 }
 
+//----------------------------------------
+// Other
+
 func EncodeBool(w io.Writer, b bool) (err error) {
 	if b {
-		err = EncodeUint8(w, 1)
+		err = EncodeUint8(w, 1) // same as EncodeUvarint(w, 1).
 	} else {
-		err = EncodeUint8(w, 0)
+		err = EncodeUint8(w, 0) // same as EncodeUvarint(w, 0).
 	}
 	return
 }
 
+// NOTE: UNSAFE
 func EncodeFloat32(w io.Writer, f float32) (err error) {
 	return EncodeUint32(w, math.Float32bits(f))
 }
 
+// NOTE: UNSAFE
 func EncodeFloat64(w io.Writer, f float64) (err error) {
 	return EncodeUint64(w, math.Float64bits(f))
 }
 
+// EncodeTime writes the number of seconds (int64) and nanoseconds (int32),
+// with millisecond resolution since January 1, 1970 UTC to the Writer as an
+// Int64.
+// Milliseconds are used to ease compatibility with Javascript,
+// which does not support finer resolution.
 func EncodeTime(w io.Writer, t time.Time) (err error) {
 	var s = t.Unix()
-	var ns = int32(t.Nanosecond())
+	var ns = int32(t.Nanosecond()) // this int64 -> int32 is safe.
+
+	// TODO: We are hand-encoding a struct until MarshalAmino/UnmarshalAmino is supported.
 
 	err = encodeFieldNumberAndTyp3(w, 1, Typ3_8Byte)
 	if err != nil {
@@ -120,7 +138,7 @@ func EncodeTime(w io.Writer, t time.Time) (err error) {
 		return
 	}
 
-	err = EncodeByte(w, byte(0x04))
+	err = EncodeByte(w, byte(0x04)) // StructTerm
 	return
 }
 

@@ -1,3 +1,7 @@
+// Modified for Tendermint
+// Originally Copyright (c) 2013-2014 Conformal Systems LLC.
+// https://github.com/conformal/btcd/blob/master/LICENSE
+
 package pex
 
 import (
@@ -15,101 +19,126 @@ import (
 )
 
 const (
-	bucketTypeNew	= 0x01
-	bucketTypeOld	= 0x02
+	bucketTypeNew = 0x01
+	bucketTypeOld = 0x02
 )
 
+// AddrBook is an address book used for tracking peers
+// so we can gossip about them to others and select
+// peers to dial.
+// TODO: break this up?
 type AddrBook interface {
 	cmn.Service
 
+	// Add our own addresses so we don't later add ourselves
 	AddOurAddress(*p2p.NetAddress)
-
+	// Check if it is our address
 	OurAddress(*p2p.NetAddress) bool
 
+	// Add and remove an address
 	AddAddress(addr *p2p.NetAddress, src *p2p.NetAddress) error
 	RemoveAddress(*p2p.NetAddress)
 
+	// Check if the address is in the book
 	HasAddress(*p2p.NetAddress) bool
 
+	// Do we need more peers?
 	NeedMoreAddrs() bool
 
+	// Pick an address to dial
 	PickAddress(biasTowardsNewAddrs int) *p2p.NetAddress
 
+	// Mark address
 	MarkGood(*p2p.NetAddress)
 	MarkAttempt(*p2p.NetAddress)
 	MarkBad(*p2p.NetAddress)
 
 	IsGood(*p2p.NetAddress) bool
 
+	// Send a selection of addresses to peers
 	GetSelection() []*p2p.NetAddress
-
+	// Send a selection of addresses with bias
 	GetSelectionWithBias(biasTowardsNewAddrs int) []*p2p.NetAddress
 
+	// TODO: remove
 	ListOfKnownAddresses() []*knownAddress
 
+	// Persist to disk
 	Save()
 }
 
 var _ AddrBook = (*addrBook)(nil)
 
+// addrBook - concurrency safe peer address manager.
+// Implements AddrBook.
 type addrBook struct {
 	cmn.BaseService
 
-	filePath		string
-	routabilityStrict	bool
-	key			string
+	// immutable after creation
+	filePath          string
+	routabilityStrict bool
+	key               string // random prefix for bucket placement
 
-	mtx		sync.Mutex
-	rand		*cmn.Rand
-	ourAddrs	map[string]struct{}
-	addrLookup	map[p2p.ID]*knownAddress
-	bucketsOld	[]map[string]*knownAddress
-	bucketsNew	[]map[string]*knownAddress
-	nOld		int
-	nNew		int
+	// accessed concurrently
+	mtx        sync.Mutex
+	rand       *cmn.Rand
+	ourAddrs   map[string]struct{}
+	addrLookup map[p2p.ID]*knownAddress // new & old
+	bucketsOld []map[string]*knownAddress
+	bucketsNew []map[string]*knownAddress
+	nOld       int
+	nNew       int
 
-	wg	sync.WaitGroup
+	wg sync.WaitGroup
 }
 
+// NewAddrBook creates a new address book.
+// Use Start to begin processing asynchronous address updates.
 func NewAddrBook(filePath string, routabilityStrict bool) *addrBook {
 	am := &addrBook{
-		rand:			cmn.NewRand(),
-		ourAddrs:		make(map[string]struct{}),
-		addrLookup:		make(map[p2p.ID]*knownAddress),
-		filePath:		filePath,
-		routabilityStrict:	routabilityStrict,
+		rand:              cmn.NewRand(),
+		ourAddrs:          make(map[string]struct{}),
+		addrLookup:        make(map[p2p.ID]*knownAddress),
+		filePath:          filePath,
+		routabilityStrict: routabilityStrict,
 	}
 	am.init()
 	am.BaseService = *cmn.NewBaseService(nil, "AddrBook", am)
 	return am
 }
 
+// Initialize the buckets.
+// When modifying this, don't forget to update loadFromFile()
 func (a *addrBook) init() {
-	a.key = crypto.CRandHex(24)
-
+	a.key = crypto.CRandHex(24) // 24/2 * 8 = 96 bits
+	// New addr buckets
 	a.bucketsNew = make([]map[string]*knownAddress, newBucketCount)
 	for i := range a.bucketsNew {
 		a.bucketsNew[i] = make(map[string]*knownAddress)
 	}
-
+	// Old addr buckets
 	a.bucketsOld = make([]map[string]*knownAddress, oldBucketCount)
 	for i := range a.bucketsOld {
 		a.bucketsOld[i] = make(map[string]*knownAddress)
 	}
 }
 
+// OnStart implements Service.
 func (a *addrBook) OnStart() error {
 	if err := a.BaseService.OnStart(); err != nil {
 		return err
 	}
 	a.loadFromFile(a.filePath)
 
+	// wg.Add to ensure that any invocation of .Wait()
+	// later on will wait for saveRoutine to terminate.
 	a.wg.Add(1)
 	go a.saveRoutine()
 
 	return nil
 }
 
+// OnStop implements Service.
 func (a *addrBook) OnStop() {
 	a.BaseService.OnStop()
 }
@@ -122,6 +151,9 @@ func (a *addrBook) FilePath() string {
 	return a.filePath
 }
 
+//-------------------------------------------------------
+
+// AddOurAddress one of our addresses.
 func (a *addrBook) AddOurAddress(addr *p2p.NetAddress) {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -129,6 +161,7 @@ func (a *addrBook) AddOurAddress(addr *p2p.NetAddress) {
 	a.ourAddrs[addr.String()] = struct{}{}
 }
 
+// OurAddress returns true if it is our address.
 func (a *addrBook) OurAddress(addr *p2p.NetAddress) bool {
 	a.mtx.Lock()
 	_, ok := a.ourAddrs[addr.String()]
@@ -136,12 +169,15 @@ func (a *addrBook) OurAddress(addr *p2p.NetAddress) bool {
 	return ok
 }
 
+// AddAddress implements AddrBook - adds the given address as received from the given source.
+// NOTE: addr must not be nil
 func (a *addrBook) AddAddress(addr *p2p.NetAddress, src *p2p.NetAddress) error {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
 	return a.addAddress(addr, src)
 }
 
+// RemoveAddress implements AddrBook - removes the address from the book.
 func (a *addrBook) RemoveAddress(addr *p2p.NetAddress) {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -153,12 +189,15 @@ func (a *addrBook) RemoveAddress(addr *p2p.NetAddress) {
 	a.removeFromAllBuckets(ka)
 }
 
+// IsGood returns true if peer was ever marked as good and haven't
+// done anything wrong since then.
 func (a *addrBook) IsGood(addr *p2p.NetAddress) bool {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
 	return a.addrLookup[addr.ID].isOld()
 }
 
+// HasAddress returns true if the address is in the book.
 func (a *addrBook) HasAddress(addr *p2p.NetAddress) bool {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -166,10 +205,17 @@ func (a *addrBook) HasAddress(addr *p2p.NetAddress) bool {
 	return ka != nil
 }
 
+// NeedMoreAddrs implements AddrBook - returns true if there are not have enough addresses in the book.
 func (a *addrBook) NeedMoreAddrs() bool {
 	return a.Size() < needAddressThreshold
 }
 
+// PickAddress implements AddrBook. It picks an address to connect to.
+// The address is picked randomly from an old or new bucket according
+// to the biasTowardsNewAddrs argument, which must be between [0, 100] (or else is truncated to that range)
+// and determines how biased we are to pick an address from a new bucket.
+// PickAddress returns nil if the AddrBook is empty or if we try to pick
+// from an empty bucket.
 func (a *addrBook) PickAddress(biasTowardsNewAddrs int) *p2p.NetAddress {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -184,16 +230,18 @@ func (a *addrBook) PickAddress(biasTowardsNewAddrs int) *p2p.NetAddress {
 		biasTowardsNewAddrs = 0
 	}
 
+	// Bias between new and old addresses.
 	oldCorrelation := math.Sqrt(float64(a.nOld)) * (100.0 - float64(biasTowardsNewAddrs))
 	newCorrelation := math.Sqrt(float64(a.nNew)) * float64(biasTowardsNewAddrs)
 
+	// pick a random peer from a random bucket
 	var bucket map[string]*knownAddress
 	pickFromOldBucket := (newCorrelation+oldCorrelation)*a.rand.Float64() < oldCorrelation
 	if (pickFromOldBucket && a.nOld == 0) ||
 		(!pickFromOldBucket && a.nNew == 0) {
 		return nil
 	}
-
+	// loop until we pick a random non-empty bucket
 	for len(bucket) == 0 {
 		if pickFromOldBucket {
 			bucket = a.bucketsOld[a.rand.Intn(len(a.bucketsOld))]
@@ -201,7 +249,7 @@ func (a *addrBook) PickAddress(biasTowardsNewAddrs int) *p2p.NetAddress {
 			bucket = a.bucketsNew[a.rand.Intn(len(a.bucketsNew))]
 		}
 	}
-
+	// pick a random index and loop over the map to return that index
 	randIndex := a.rand.Intn(len(bucket))
 	for _, ka := range bucket {
 		if randIndex == 0 {
@@ -212,6 +260,8 @@ func (a *addrBook) PickAddress(biasTowardsNewAddrs int) *p2p.NetAddress {
 	return nil
 }
 
+// MarkGood implements AddrBook - it marks the peer as good and
+// moves it into an "old" bucket.
 func (a *addrBook) MarkGood(addr *p2p.NetAddress) {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -225,6 +275,7 @@ func (a *addrBook) MarkGood(addr *p2p.NetAddress) {
 	}
 }
 
+// MarkAttempt implements AddrBook - it marks that an attempt was made to connect to the address.
 func (a *addrBook) MarkAttempt(addr *p2p.NetAddress) {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -235,10 +286,14 @@ func (a *addrBook) MarkAttempt(addr *p2p.NetAddress) {
 	ka.markAttempt()
 }
 
+// MarkBad implements AddrBook. Currently it just ejects the address.
+// TODO: black list for some amount of time
 func (a *addrBook) MarkBad(addr *p2p.NetAddress) {
 	a.RemoveAddress(addr)
 }
 
+// GetSelection implements AddrBook.
+// It randomly selects some addresses (old & new). Suitable for peer-exchange protocols.
 func (a *addrBook) GetSelection() []*p2p.NetAddress {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -259,15 +314,26 @@ func (a *addrBook) GetSelection() []*p2p.NetAddress {
 		len(allAddr)*getSelectionPercent/100)
 	numAddresses = cmn.MinInt(maxGetSelection, numAddresses)
 
+	// Fisher-Yates shuffle the array. We only need to do the first
+	// `numAddresses' since we are throwing the rest.
+	// XXX: What's the point of this if we already loop randomly through addrLookup ?
 	for i := 0; i < numAddresses; i++ {
-
+		// pick a number between current index and the end
 		j := cmn.RandIntn(len(allAddr)-i) + i
 		allAddr[i], allAddr[j] = allAddr[j], allAddr[i]
 	}
 
+	// slice off the limit we are willing to share.
 	return allAddr[:numAddresses]
 }
 
+// GetSelectionWithBias implements AddrBook.
+// It randomly selects some addresses (old & new). Suitable for peer-exchange protocols.
+//
+// Each address is picked randomly from an old or new bucket according to the
+// biasTowardsNewAddrs argument, which must be between [0, 100] (or else is truncated to
+// that range) and determines how biased we are to pick an address from a new
+// bucket.
 func (a *addrBook) GetSelectionWithBias(biasTowardsNewAddrs int) []*p2p.NetAddress {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -302,6 +368,7 @@ ADDRS_LOOP:
 		pickFromOldBucket = (pickFromOldBucket && a.nOld > 0) || a.nNew == 0
 		bucket := make(map[string]*knownAddress)
 
+		// loop until we pick a random non-empty bucket
 		for len(bucket) == 0 {
 			if pickFromOldBucket {
 				oldIndex = a.rand.Intn(len(a.bucketsOld))
@@ -312,8 +379,10 @@ ADDRS_LOOP:
 			}
 		}
 
+		// pick a random index
 		randIndex := a.rand.Intn(len(bucket))
 
+		// loop over the map to return that index
 		var selectedAddr *p2p.NetAddress
 		for _, ka := range bucket {
 			if randIndex == 0 {
@@ -323,6 +392,8 @@ ADDRS_LOOP:
 			randIndex--
 		}
 
+		// if we have selected the address before, restart the loop
+		// otherwise, record it and continue
 		if pickFromOldBucket {
 			if addrsMap, ok := oldBucketToAddrsMap[oldIndex]; ok {
 				if _, ok = addrsMap[selectedAddr.String()]; ok {
@@ -350,6 +421,7 @@ ADDRS_LOOP:
 	return selection
 }
 
+// ListOfKnownAddresses returns the new and old addresses.
 func (a *addrBook) ListOfKnownAddresses() []*knownAddress {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -361,6 +433,9 @@ func (a *addrBook) ListOfKnownAddresses() []*knownAddress {
 	return addrs
 }
 
+//------------------------------------------------
+
+// Size returns the number of addresses in the book.
 func (a *addrBook) Size() int {
 	a.mtx.Lock()
 	defer a.mtx.Unlock()
@@ -371,8 +446,11 @@ func (a *addrBook) size() int {
 	return a.nNew + a.nOld
 }
 
+//----------------------------------------------------------
+
+// Save persists the address book to disk.
 func (a *addrBook) Save() {
-	a.saveToFile(a.filePath)
+	a.saveToFile(a.filePath) // thread safe
 }
 
 func (a *addrBook) saveRoutine() {
@@ -393,6 +471,8 @@ out:
 	a.Logger.Info("Address handler done")
 }
 
+//----------------------------------------------------------
+
 func (a *addrBook) getBucket(bucketType byte, bucketIdx int) map[string]*knownAddress {
 	switch bucketType {
 	case bucketTypeNew:
@@ -405,8 +485,10 @@ func (a *addrBook) getBucket(bucketType byte, bucketIdx int) map[string]*knownAd
 	}
 }
 
+// Adds ka to new bucket. Returns false if it couldn't do it cuz buckets full.
+// NOTE: currently it always returns true.
 func (a *addrBook) addToNewBucket(ka *knownAddress, bucketIdx int) bool {
-
+	// Sanity check
 	if ka.isOld() {
 		a.Logger.Error(cmn.Fmt("Cannot add address already in old bucket to a new bucket: %v", ka))
 		return false
@@ -415,28 +497,33 @@ func (a *addrBook) addToNewBucket(ka *knownAddress, bucketIdx int) bool {
 	addrStr := ka.Addr.String()
 	bucket := a.getBucket(bucketTypeNew, bucketIdx)
 
+	// Already exists?
 	if _, ok := bucket[addrStr]; ok {
 		return true
 	}
 
+	// Enforce max addresses.
 	if len(bucket) > newBucketSize {
 		a.Logger.Info("new bucket is full, expiring new")
 		a.expireNew(bucketIdx)
 	}
 
+	// Add to bucket.
 	bucket[addrStr] = ka
-
+	// increment nNew if the peer doesnt already exist in a bucket
 	if ka.addBucketRef(bucketIdx) == 1 {
 		a.nNew++
 	}
 
+	// Add it to addrLookup
 	a.addrLookup[ka.ID()] = ka
 
 	return true
 }
 
+// Adds ka to old bucket. Returns false if it couldn't do it cuz buckets full.
 func (a *addrBook) addToOldBucket(ka *knownAddress, bucketIdx int) bool {
-
+	// Sanity check
 	if ka.isNew() {
 		a.Logger.Error(cmn.Fmt("Cannot add new address to old bucket: %v", ka))
 		return false
@@ -449,19 +536,23 @@ func (a *addrBook) addToOldBucket(ka *knownAddress, bucketIdx int) bool {
 	addrStr := ka.Addr.String()
 	bucket := a.getBucket(bucketTypeOld, bucketIdx)
 
+	// Already exists?
 	if _, ok := bucket[addrStr]; ok {
 		return true
 	}
 
+	// Enforce max addresses.
 	if len(bucket) > oldBucketSize {
 		return false
 	}
 
+	// Add to bucket.
 	bucket[addrStr] = ka
 	if ka.addBucketRef(bucketIdx) == 1 {
 		a.nOld++
 	}
 
+	// Ensure in addrLookup
 	a.addrLookup[ka.ID()] = ka
 
 	return true
@@ -498,6 +589,8 @@ func (a *addrBook) removeFromAllBuckets(ka *knownAddress) {
 	delete(a.addrLookup, ka.ID())
 }
 
+//----------------------------------------------------------
+
 func (a *addrBook) pickOldest(bucketType byte, bucketIdx int) *knownAddress {
 	bucket := a.getBucket(bucketType, bucketIdx)
 	var oldest *knownAddress
@@ -509,27 +602,29 @@ func (a *addrBook) pickOldest(bucketType byte, bucketIdx int) *knownAddress {
 	return oldest
 }
 
+// adds the address to a "new" bucket. if its already in one,
+// it only adds it probabilistically
 func (a *addrBook) addAddress(addr, src *p2p.NetAddress) error {
 	if a.routabilityStrict && !addr.Routable() {
 		return fmt.Errorf("Cannot add non-routable address %v", addr)
 	}
 	if _, ok := a.ourAddrs[addr.String()]; ok {
-
+		// Ignore our own listener address.
 		return fmt.Errorf("Cannot add ourselves with address %v", addr)
 	}
 
 	ka := a.addrLookup[addr.ID]
 
 	if ka != nil {
-
+		// Already old.
 		if ka.isOld() {
 			return nil
 		}
-
+		// Already in max new buckets.
 		if len(ka.Buckets) == maxNewBucketsPerAddress {
 			return nil
 		}
-
+		// The more entries we have, the less likely we are to add more.
 		factor := int32(2 * len(ka.Buckets))
 		if a.rand.Int31n(factor) != 0 {
 			return nil
@@ -548,9 +643,11 @@ func (a *addrBook) addAddress(addr, src *p2p.NetAddress) error {
 	return nil
 }
 
+// Make space in the new buckets by expiring the really bad entries.
+// If no bad entries are available we remove the oldest.
 func (a *addrBook) expireNew(bucketIdx int) {
 	for addrStr, ka := range a.bucketsNew[bucketIdx] {
-
+		// If an entry is bad, throw it away
 		if ka.isBad() {
 			a.Logger.Info(cmn.Fmt("expiring bad address %v", addrStr))
 			a.removeFromBucket(ka, bucketTypeNew, bucketIdx)
@@ -558,12 +655,16 @@ func (a *addrBook) expireNew(bucketIdx int) {
 		}
 	}
 
+	// If we haven't thrown out a bad entry, throw out the oldest entry
 	oldest := a.pickOldest(bucketTypeNew, bucketIdx)
 	a.removeFromBucket(oldest, bucketTypeNew, bucketIdx)
 }
 
+// Promotes an address from new to old. If the destination bucket is full,
+// demote the oldest one to a "new" bucket.
+// TODO: Demote more probabilistically?
 func (a *addrBook) moveToOld(ka *knownAddress) {
-
+	// Sanity check
 	if ka.isOld() {
 		a.Logger.Error(cmn.Fmt("Cannot promote address that is already old %v", ka))
 		return
@@ -573,29 +674,31 @@ func (a *addrBook) moveToOld(ka *knownAddress) {
 		return
 	}
 
+	// Remember one of the buckets in which ka is in.
 	freedBucket := ka.Buckets[0]
-
+	// Remove from all (new) buckets.
 	a.removeFromAllBuckets(ka)
-
+	// It's officially old now.
 	ka.BucketType = bucketTypeOld
 
+	// Try to add it to its oldBucket destination.
 	oldBucketIdx := a.calcOldBucket(ka.Addr)
 	added := a.addToOldBucket(ka, oldBucketIdx)
 	if !added {
-
+		// No room, must evict something
 		oldest := a.pickOldest(bucketTypeOld, oldBucketIdx)
 		a.removeFromBucket(oldest, bucketTypeOld, oldBucketIdx)
-
+		// Find new bucket to put oldest in
 		newBucketIdx := a.calcNewBucket(oldest.Addr, oldest.Src)
 		added := a.addToNewBucket(oldest, newBucketIdx)
-
+		// No space in newBucket either, just put it in freedBucket from above.
 		if !added {
 			added := a.addToNewBucket(oldest, freedBucket)
 			if !added {
 				a.Logger.Error(cmn.Fmt("Could not migrate oldest %v to freedBucket %v", oldest, freedBucket))
 			}
 		}
-
+		// Finally, add to bucket again.
 		added = a.addToOldBucket(ka, oldBucketIdx)
 		if !added {
 			a.Logger.Error(cmn.Fmt("Could not re-add ka %v to oldBucketIdx %v", ka, oldBucketIdx))
@@ -603,6 +706,11 @@ func (a *addrBook) moveToOld(ka *knownAddress) {
 	}
 }
 
+//---------------------------------------------------------------------
+// calculate bucket placements
+
+// doublesha256(  key + sourcegroup +
+//                int64(doublesha256(key + group + sourcegroup))%bucket_per_group  ) % num_new_buckets
 func (a *addrBook) calcNewBucket(addr, src *p2p.NetAddress) int {
 	data1 := []byte{}
 	data1 = append(data1, []byte(a.key)...)
@@ -622,6 +730,8 @@ func (a *addrBook) calcNewBucket(addr, src *p2p.NetAddress) int {
 	return int(binary.BigEndian.Uint64(hash2) % newBucketCount)
 }
 
+// doublesha256(  key + group +
+//                int64(doublesha256(key + addr))%buckets_per_group  ) % num_old_buckets
 func (a *addrBook) calcOldBucket(addr *p2p.NetAddress) int {
 	data1 := []byte{}
 	data1 = append(data1, []byte(a.key)...)
@@ -640,6 +750,10 @@ func (a *addrBook) calcOldBucket(addr *p2p.NetAddress) int {
 	return int(binary.BigEndian.Uint64(hash2) % oldBucketCount)
 }
 
+// Return a string representing the network group of this address.
+// This is the /16 for IPv4, the /32 (/36 for he.net) for IPv6, the string
+// "local" for a local address and the string "unroutable" for an unroutable
+// address.
 func (a *addrBook) groupKey(na *p2p.NetAddress) string {
 	if a.routabilityStrict && na.Local() {
 		return "local"
@@ -652,7 +766,7 @@ func (a *addrBook) groupKey(na *p2p.NetAddress) string {
 		return (&net.IPNet{IP: na.IP, Mask: net.CIDRMask(16, 32)}).String()
 	}
 	if na.RFC6145() || na.RFC6052() {
-
+		// last four bytes are the ip address
 		ip := net.IP(na.IP[12:16])
 		return (&net.IPNet{IP: ip, Mask: net.CIDRMask(16, 32)}).String()
 	}
@@ -663,7 +777,8 @@ func (a *addrBook) groupKey(na *p2p.NetAddress) string {
 
 	}
 	if na.RFC4380() {
-
+		// teredo tunnels have the last 4 bytes as the v4 address XOR
+		// 0xff.
 		ip := net.IP(make([]byte, 4))
 		for i, byte := range na.IP[12:16] {
 			ip[i] = byte ^ 0xff
@@ -671,9 +786,12 @@ func (a *addrBook) groupKey(na *p2p.NetAddress) string {
 		return (&net.IPNet{IP: ip, Mask: net.CIDRMask(16, 32)}).String()
 	}
 
+	// OK, so now we know ourselves to be a IPv6 address.
+	// bitcoind uses /32 for everything, except for Hurricane Electric's
+	// (he.net) IP range, which it uses /36 for.
 	bits := 32
 	heNet := &net.IPNet{IP: net.ParseIP("2001:470::"),
-		Mask:	net.CIDRMask(32, 128)}
+		Mask: net.CIDRMask(32, 128)}
 	if heNet.Contains(na.IP) {
 		bits = 36
 	}
@@ -681,11 +799,12 @@ func (a *addrBook) groupKey(na *p2p.NetAddress) string {
 	return (&net.IPNet{IP: na.IP, Mask: net.CIDRMask(bits, 128)}).String()
 }
 
+// doubleSha256 calculates sha256(sha256(b)) and returns the resulting bytes.
 func doubleSha256(b []byte) []byte {
 	hasher := sha256.New()
-	hasher.Write(b)
+	hasher.Write(b) // nolint: errcheck, gas
 	sum := hasher.Sum(nil)
 	hasher.Reset()
-	hasher.Write(sum)
+	hasher.Write(sum) // nolint: errcheck, gas
 	return hasher.Sum(nil)
 }

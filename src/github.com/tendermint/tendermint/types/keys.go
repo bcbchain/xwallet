@@ -1,6 +1,7 @@
 package types
 
+// UNSTABLE
 var (
-	PeerStateKey		= "ConsensusReactor.peerState"
-	PeerMempoolChKey	= "MempoolReactor.peerMempoolCh"
+	PeerStateKey     = "ConsensusReactor.peerState"
+	PeerMempoolChKey = "MempoolReactor.peerMempoolCh"
 )

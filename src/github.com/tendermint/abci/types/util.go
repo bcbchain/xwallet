@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 )
 
+//------------------------------------------------------------------------------
+
+// Validators is a list of validators that implements the Sort interface
 type Validators []Validator
 
 func (v Validators) Len() int {
 	return len(v)
 }
 
+// XXX: doesn't distinguish same validator with different power
 func (v Validators) Less(i, j int) bool {
 	return bytes.Compare(v[i].PubKey, v[j].PubKey) <= 0
 }
@@ -34,8 +38,8 @@ func ValidatorsString(vs Validators) string {
 }
 
 type validatorPretty struct {
-	PubKey		[]byte	`json:"pub_key"`
-	Power		uint64	`json:"power"`
-	RewardAddr	string	`json:"reward_addr"`
-	Name		string	`json:"name"`
+	PubKey     []byte `json:"pub_key"`
+	Power      uint64 `json:"power"`
+	RewardAddr string `json:"reward_addr"`
+	Name       string `json:"name"`
 }

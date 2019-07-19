@@ -16,6 +16,7 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
+	// Read a bunch of responses
 	go func() {
 		counter := 0
 		for {
@@ -31,6 +32,7 @@ func main() {
 		}
 	}()
 
+	// Write a bunch of requests
 	counter := 0
 	for i := 0; ; i++ {
 		var bufWriter = bufio.NewWriter(conn)

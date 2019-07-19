@@ -2,14 +2,17 @@ package db
 
 import "fmt"
 
+//----------------------------------------
+// Main entry
+
 type DBBackendType string
 
 const (
-	LevelDBBackend		DBBackendType	= "leveldb"
-	CLevelDBBackend		DBBackendType	= "cleveldb"
-	GoLevelDBBackend	DBBackendType	= "goleveldb"
-	MemDBBackend		DBBackendType	= "memdb"
-	FSDBBackend		DBBackendType	= "fsdb"
+	LevelDBBackend   DBBackendType = "leveldb" // legacy, defaults to goleveldb unless +gcc
+	CLevelDBBackend  DBBackendType = "cleveldb"
+	GoLevelDBBackend DBBackendType = "goleveldb"
+	MemDBBackend     DBBackendType = "memdb"
+	FSDBBackend      DBBackendType = "fsdb" // using the filesystem naively
 )
 
 type dbCreator func(name string, dir string) (DB, error)

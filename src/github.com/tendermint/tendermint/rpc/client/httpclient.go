@@ -6,36 +6,48 @@ import (
 
 	"github.com/pkg/errors"
 
+	"common/rpc/lib/client"
+
 	"github.com/tendermint/go-amino"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
-	"github.com/tendermint/tendermint/rpc/lib/client"
 	"github.com/tendermint/tendermint/types"
 	cmn "github.com/tendermint/tmlibs/common"
 	tmpubsub "github.com/tendermint/tmlibs/pubsub"
 )
 
+/*
+HTTP is a Client implementation that communicates
+with a tendermint node over json rpc and websockets.
+
+This is the main implementation you probably want to use in
+production code.  There are other implementations when calling
+the tendermint node in-process (local), or when you want to mock
+out the server for test code (mock).
+*/
 type HTTP struct {
-	remote	string
-	rpc	*rpcclient.JSONRPCClient
+	remote string
+	rpc    *rpcclient.JSONRPCClient
 	*WSEvents
 }
 
+// New takes a remote endpoint in the form tcp://<host>:<port>
+// and the websocket path (which always seems to be "/websocket")
 func NewHTTP(remote, wsEndpoint string) *HTTP {
 	rc := rpcclient.NewJSONRPCClient(remote)
 	cdc := rc.Codec()
 	ctypes.RegisterAmino(cdc)
 
 	return &HTTP{
-		rpc:		rc,
-		remote:		remote,
-		WSEvents:	newWSEvents(cdc, remote, wsEndpoint),
+		rpc:      rc,
+		remote:   remote,
+		WSEvents: newWSEvents(cdc, remote, wsEndpoint),
 	}
 }
 
 var (
-	_	Client		= (*HTTP)(nil)
-	_	NetworkClient	= (*HTTP)(nil)
-	_	EventsClient	= (*HTTP)(nil)
+	_ Client        = (*HTTP)(nil)
+	_ NetworkClient = (*HTTP)(nil)
+	_ EventsClient  = (*HTTP)(nil)
 )
 
 func (c *HTTP) Status() (*ctypes.ResultStatus, error) {
@@ -183,8 +195,8 @@ func (c *HTTP) Commit(height *int64) (*ctypes.ResultCommit, error) {
 func (c *HTTP) Tx(hash []byte, prove bool) (*ctypes.ResultTx, error) {
 	result := new(ctypes.ResultTx)
 	params := map[string]interface{}{
-		"hash":		hash,
-		"prove":	prove,
+		"hash":  hash,
+		"prove": prove,
 	}
 	_, err := c.rpc.Call("tx", params, result)
 	if err != nil {
@@ -196,8 +208,8 @@ func (c *HTTP) Tx(hash []byte, prove bool) (*ctypes.ResultTx, error) {
 func (c *HTTP) TxSearch(query string, prove bool) ([]*ctypes.ResultTx, error) {
 	results := new([]*ctypes.ResultTx)
 	params := map[string]interface{}{
-		"query":	query,
-		"prove":	prove,
+		"query": query,
+		"prove": prove,
 	}
 	_, err := c.rpc.Call("tx_search", params, results)
 	if err != nil {
@@ -215,23 +227,25 @@ func (c *HTTP) Validators(height *int64) (*ctypes.ResultValidators, error) {
 	return result, nil
 }
 
+/** websocket event stuff here... **/
+
 type WSEvents struct {
 	cmn.BaseService
-	cdc		*amino.Codec
-	remote		string
-	endpoint	string
-	ws		*rpcclient.WSClient
+	cdc      *amino.Codec
+	remote   string
+	endpoint string
+	ws       *rpcclient.WSClient
 
-	mtx		sync.RWMutex
-	subscriptions	map[string]chan<- interface{}
+	mtx           sync.RWMutex
+	subscriptions map[string]chan<- interface{}
 }
 
 func newWSEvents(cdc *amino.Codec, remote, endpoint string) *WSEvents {
 	wsEvents := &WSEvents{
-		cdc:		cdc,
-		endpoint:	endpoint,
-		remote:		remote,
-		subscriptions:	make(map[string]chan<- interface{}),
+		cdc:           cdc,
+		endpoint:      endpoint,
+		remote:        remote,
+		subscriptions: make(map[string]chan<- interface{}),
 	}
 
 	wsEvents.BaseService = *cmn.NewBaseService(nil, "WSEvents", wsEvents)
@@ -253,6 +267,7 @@ func (w *WSEvents) OnStart() error {
 	return nil
 }
 
+// Stop wraps the BaseService/eventSwitch actions as Start does
 func (w *WSEvents) OnStop() {
 	err := w.ws.Stop()
 	if err != nil {
@@ -269,7 +284,8 @@ func (w *WSEvents) Subscribe(ctx context.Context, subscriber string, query tmpub
 	}
 
 	w.mtx.Lock()
-
+	// subscriber param is ignored because Tendermint will override it with
+	// remote IP anyway.
 	w.subscriptions[q] = out
 	w.mtx.Unlock()
 
@@ -311,13 +327,20 @@ func (w *WSEvents) UnsubscribeAll(ctx context.Context, subscriber string) error 
 	return nil
 }
 
+// After being reconnected, it is necessary to redo subscription to server
+// otherwise no data will be automatically received.
 func (w *WSEvents) redoSubscriptions() {
 	for q := range w.subscriptions {
-
+		// NOTE: no timeout for resubscribing
+		// FIXME: better logging/handling of errors??
 		w.ws.Subscribe(context.Background(), q)
 	}
 }
 
+// eventListener is an infinite loop pulling all websocket events
+// and pushing them to the EventSwitch.
+//
+// the goroutine only stops by closing quit
 func (w *WSEvents) eventListener() {
 	for {
 		select {
@@ -335,7 +358,8 @@ func (w *WSEvents) eventListener() {
 				w.Logger.Error("failed to unmarshal response", "err", err)
 				continue
 			}
-
+			// NOTE: writing also happens inside mutex so we can't close a channel in
+			// Unsubscribe/UnsubscribeAll.
 			w.mtx.RLock()
 			if ch, ok := w.subscriptions[result.Query]; ok {
 				ch <- result.Data

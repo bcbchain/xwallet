@@ -14,13 +14,13 @@ import (
 func TestMarshalJSON(t *testing.T) {
 	b, err := json.Marshal(&ResponseDeliverTx{})
 	assert.Nil(t, err)
-
+	// Do not include empty fields.
 	assert.False(t, strings.Contains(string(b), "code"))
 
 	r1 := ResponseCheckTx{
-		Code:		1,
-		Data:		[]byte("hello"),
-		GasWanted:	43,
+		Code:      1,
+		Data:      []byte("hello"),
+		GasWanted: 43,
 		Tags: []cmn.KVPair{
 			{[]byte("pho"), []byte("bo")},
 		},
@@ -59,6 +59,7 @@ func TestWriteReadMessage(t *testing.T) {
 		&Header{
 			NumTxs: 4,
 		},
+		// TODO: add the rest
 	}
 
 	for _, c := range cases {
@@ -78,13 +79,15 @@ func TestWriteReadMessage2(t *testing.T) {
 	phrase := "hello-world"
 	cases := []proto.Message{
 		&ResponseCheckTx{
-			Data:		[]byte(phrase),
-			Log:		phrase,
-			GasWanted:	10,
+			Data:      []byte(phrase),
+			Log:       phrase,
+			GasWanted: 10,
 			Tags: []cmn.KVPair{
 				cmn.KVPair{[]byte("abc"), []byte("def")},
 			},
+			// Fee: cmn.KI64Pair{
 		},
+		// TODO: add the rest
 	}
 
 	for _, c := range cases {

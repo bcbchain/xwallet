@@ -35,8 +35,8 @@ func TestNestedJSON(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 
 	cases := []struct {
-		expected	string
-		foo		Fooer
+		expected string
+		foo      Fooer
 	}{
 		{"Bar Fly", Bar{Name: "Fly"}},
 		{"Foz Baz", Baz{Name: "For Bar"}},
@@ -47,7 +47,7 @@ func TestNestedJSON(t *testing.T) {
 		assert.Equal(tc.expected, tc.foo.Foo())
 		wrap := FooerS{tc.foo}
 		parsed := FooerS{}
-
+		// also works with indentation
 		d, err := data.ToJSON(wrap)
 		require.Nil(err, "%+v", err)
 		err = json.Unmarshal(d, &parsed)

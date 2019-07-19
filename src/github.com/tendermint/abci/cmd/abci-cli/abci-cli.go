@@ -24,38 +24,44 @@ import (
 	"github.com/tendermint/abci/version"
 )
 
+// client is a global variable so it can be reused by the console
 var (
-	client	abcicli.Client
-	logger	log.Logger
+	client abcicli.Client
+	logger log.Logger
 )
 
+// flags
 var (
-	flagAddress	string
-	flagAbci	string
-	flagVerbose	bool
-	flagLogLevel	string
+	// global
+	flagAddress  string
+	flagAbci     string
+	flagVerbose  bool   // for the println output
+	flagLogLevel string // for the logger
 
-	flagPath	string
-	flagHeight	int
-	flagProve	bool
+	// query
+	flagPath   string
+	flagHeight int
+	flagProve  bool
 
-	flagAddrC	string
-	flagSerial	bool
+	// counter
+	flagAddrC  string
+	flagSerial bool
 
-	flagAddrD	string
-	flagPersist	string
+	// kvstore
+	flagAddrD   string
+	flagPersist string
 )
 
 var RootCmd = &cobra.Command{
-	Use:	"abci-cli",
-	Short:	"the ABCI CLI tool wraps an ABCI client",
-	Long:	"the ABCI CLI tool wraps an ABCI client and is used for testing ABCI servers",
+	Use:   "abci-cli",
+	Short: "the ABCI CLI tool wraps an ABCI client",
+	Long:  "the ABCI CLI tool wraps an ABCI client and is used for testing ABCI servers",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 
 		switch cmd.Use {
-		case "counter", "kvstore", "dummy":
+		case "counter", "kvstore", "dummy": // for the examples apps, don't pre-run
 			return nil
-		case "version":
+		case "version": // skip running for version command
 			return nil
 		}
 
@@ -77,20 +83,22 @@ var RootCmd = &cobra.Command{
 	},
 }
 
+// Structure for data passed to print response.
 type response struct {
-	Data	[]byte
-	Code	uint32
-	Info	string
-	Log	string
+	// generic abci response
+	Data []byte
+	Code uint32
+	Info string
+	Log  string
 
-	Query	*queryResponse
+	Query *queryResponse
 }
 
 type queryResponse struct {
-	Key	[]byte
-	Value	[]byte
-	Height	int64
-	Proof	[]byte
+	Key    []byte
+	Value  []byte
+	Height int64
+	Proof  []byte
 }
 
 func Execute() error {
@@ -141,19 +149,20 @@ func addCommands() {
 	addQueryFlags()
 	RootCmd.AddCommand(queryCmd)
 
+	// examples
 	addCounterFlags()
 	RootCmd.AddCommand(counterCmd)
-
+	// deprecated, left for backwards compatibility
 	addDummyFlags()
 	RootCmd.AddCommand(dummyCmd)
-
+	// replaces dummy, see issue #196
 	addKVStoreFlags()
 	RootCmd.AddCommand(kvstoreCmd)
 }
 
 var batchCmd = &cobra.Command{
-	Use:	"batch",
-	Short:	"run a batch of abci commands against an application",
+	Use:   "batch",
+	Short: "run a batch of abci commands against an application",
 	Long: `run a batch of abci commands against an application
 
 This command is run by piping in a file containing a series of commands
@@ -172,90 +181,90 @@ where example.file looks something like:
     deliver_tx 0x04
     info
 `,
-	Args:	cobra.ExactArgs(0),
+	Args: cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdBatch(cmd, args)
 	},
 }
 
 var consoleCmd = &cobra.Command{
-	Use:	"console",
-	Short:	"start an interactive ABCI console for multiple commands",
+	Use:   "console",
+	Short: "start an interactive ABCI console for multiple commands",
 	Long: `start an interactive ABCI console for multiple commands
 
 This command opens an interactive console for running any of the other commands
 without opening a new connection each time
 `,
-	Args:		cobra.ExactArgs(0),
-	ValidArgs:	[]string{"echo", "info", "set_option", "deliver_tx", "check_tx", "commit", "query"},
+	Args:      cobra.ExactArgs(0),
+	ValidArgs: []string{"echo", "info", "set_option", "deliver_tx", "check_tx", "commit", "query"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdConsole(cmd, args)
 	},
 }
 
 var echoCmd = &cobra.Command{
-	Use:	"echo",
-	Short:	"have the application echo a message",
-	Long:	"have the application echo a message",
-	Args:	cobra.ExactArgs(1),
+	Use:   "echo",
+	Short: "have the application echo a message",
+	Long:  "have the application echo a message",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdEcho(cmd, args)
 	},
 }
 var infoCmd = &cobra.Command{
-	Use:	"info",
-	Short:	"get some info about the application",
-	Long:	"get some info about the application",
-	Args:	cobra.ExactArgs(0),
+	Use:   "info",
+	Short: "get some info about the application",
+	Long:  "get some info about the application",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdInfo(cmd, args)
 	},
 }
 var setOptionCmd = &cobra.Command{
-	Use:	"set_option",
-	Short:	"set an option on the application",
-	Long:	"set an option on the application",
-	Args:	cobra.ExactArgs(2),
+	Use:   "set_option",
+	Short: "set an option on the application",
+	Long:  "set an option on the application",
+	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdSetOption(cmd, args)
 	},
 }
 
 var deliverTxCmd = &cobra.Command{
-	Use:	"deliver_tx",
-	Short:	"deliver a new transaction to the application",
-	Long:	"deliver a new transaction to the application",
-	Args:	cobra.ExactArgs(1),
+	Use:   "deliver_tx",
+	Short: "deliver a new transaction to the application",
+	Long:  "deliver a new transaction to the application",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdDeliverTx(cmd, args)
 	},
 }
 
 var checkTxCmd = &cobra.Command{
-	Use:	"check_tx",
-	Short:	"validate a transaction",
-	Long:	"validate a transaction",
-	Args:	cobra.ExactArgs(1),
+	Use:   "check_tx",
+	Short: "validate a transaction",
+	Long:  "validate a transaction",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdCheckTx(cmd, args)
 	},
 }
 
 var commitCmd = &cobra.Command{
-	Use:	"commit",
-	Short:	"commit the application state and return the Merkle root hash",
-	Long:	"commit the application state and return the Merkle root hash",
-	Args:	cobra.ExactArgs(0),
+	Use:   "commit",
+	Short: "commit the application state and return the Merkle root hash",
+	Long:  "commit the application state and return the Merkle root hash",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdCommit(cmd, args)
 	},
 }
 
 var versionCmd = &cobra.Command{
-	Use:	"version",
-	Short:	"print ABCI console version",
-	Long:	"print ABCI console version",
-	Args:	cobra.ExactArgs(0),
+	Use:   "version",
+	Short: "print ABCI console version",
+	Long:  "print ABCI console version",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println(version.Version)
 		return nil
@@ -263,66 +272,72 @@ var versionCmd = &cobra.Command{
 }
 
 var queryCmd = &cobra.Command{
-	Use:	"query",
-	Short:	"query the application state",
-	Long:	"query the application state",
-	Args:	cobra.ExactArgs(1),
+	Use:   "query",
+	Short: "query the application state",
+	Long:  "query the application state",
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdQuery(cmd, args)
 	},
 }
 
 var counterCmd = &cobra.Command{
-	Use:	"counter",
-	Short:	"ABCI demo example",
-	Long:	"ABCI demo example",
-	Args:	cobra.ExactArgs(0),
+	Use:   "counter",
+	Short: "ABCI demo example",
+	Long:  "ABCI demo example",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdCounter(cmd, args)
 	},
 }
 
+// deprecated, left for backwards compatibility
 var dummyCmd = &cobra.Command{
-	Use:		"dummy",
-	Deprecated:	"use: [abci-cli kvstore] instead",
-	Short:		"ABCI demo example",
-	Long:		"ABCI demo example",
-	Args:		cobra.ExactArgs(0),
+	Use:        "dummy",
+	Deprecated: "use: [abci-cli kvstore] instead",
+	Short:      "ABCI demo example",
+	Long:       "ABCI demo example",
+	Args:       cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdKVStore(cmd, args)
 	},
 }
 
 var kvstoreCmd = &cobra.Command{
-	Use:	"kvstore",
-	Short:	"ABCI demo example",
-	Long:	"ABCI demo example",
-	Args:	cobra.ExactArgs(0),
+	Use:   "kvstore",
+	Short: "ABCI demo example",
+	Long:  "ABCI demo example",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdKVStore(cmd, args)
 	},
 }
 
 var testCmd = &cobra.Command{
-	Use:	"test",
-	Short:	"run integration tests",
-	Long:	"run integration tests",
-	Args:	cobra.ExactArgs(0),
+	Use:   "test",
+	Short: "run integration tests",
+	Long:  "run integration tests",
+	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmdTest(cmd, args)
 	},
 }
 
+// Generates new Args array based off of previous call args to maintain flag persistence
 func persistentArgs(line []byte) []string {
 
+	// generate the arguments to run from original os.Args
+	// to maintain flag arguments
 	args := os.Args
-	args = args[:len(args)-1]
+	args = args[:len(args)-1] // remove the previous command argument
 
-	if len(line) > 0 {
+	if len(line) > 0 { // prevents introduction of extra space leading to argument parse errors
 		args = append(args, strings.Split(string(line), " ")...)
 	}
 	return args
 }
+
+//--------------------------------------------------------------------------------
 
 func compose(fs []func() error) error {
 	if len(fs) == 0 {
@@ -407,25 +422,29 @@ func muxOnCommands(cmd *cobra.Command, pArgs []string) error {
 		return errors.New("expecting persistent args of the form: abci-cli [command] <...>")
 	}
 
+	// TODO: this parsing is fragile
 	var args []string
 	for i := 0; i < len(pArgs); i++ {
 		arg := pArgs[i]
 
+		// check for flags
 		if strings.HasPrefix(arg, "-") {
-
+			// if it has an equal, we can just skip
 			if strings.Contains(arg, "=") {
 				continue
 			}
-
+			// if its a boolean, we can just skip
 			_, err := cmd.Flags().GetBool(strings.TrimLeft(arg, "-"))
 			if err == nil {
 				continue
 			}
 
+			// otherwise, we need to skip the next one too
 			i += 1
 			continue
 		}
 
+		// append the actual arg
 		args = append(args, arg)
 	}
 	var subCommand string
@@ -436,7 +455,7 @@ func muxOnCommands(cmd *cobra.Command, pArgs []string) error {
 	if len(args) > 2 {
 		actualArgs = args[2:]
 	}
-	cmd.Use = subCommand
+	cmd.Use = subCommand // for later print statements ...
 
 	switch strings.ToLower(subCommand) {
 	case "check_tx":
@@ -459,7 +478,7 @@ func muxOnCommands(cmd *cobra.Command, pArgs []string) error {
 }
 
 func cmdUnimplemented(cmd *cobra.Command, args []string) error {
-
+	// TODO: Print out all the sub-commands available
 	msg := "unimplemented command"
 	if err := cmd.Help(); err != nil {
 		msg = err.Error()
@@ -468,12 +487,13 @@ func cmdUnimplemented(cmd *cobra.Command, args []string) error {
 		msg += fmt.Sprintf(" args: [%s]", strings.Join(args, " "))
 	}
 	printResponse(cmd, args, response{
-		Code:	codeBad,
-		Log:	msg,
+		Code: codeBad,
+		Log:  msg,
 	})
 	return nil
 }
 
+// Have the application echo a message
 func cmdEcho(cmd *cobra.Command, args []string) error {
 	msg := ""
 	if len(args) > 0 {
@@ -489,12 +509,13 @@ func cmdEcho(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// Get some info from the application
 func cmdInfo(cmd *cobra.Command, args []string) error {
 	var version string
 	if len(args) == 1 {
 		version = args[0]
 	}
-	res, err := client.InfoSync(types.RequestInfo{version})
+	res, err := client.InfoSync(types.RequestInfo{version, "127.0.0.1", "8080"})
 	if err != nil {
 		return err
 	}
@@ -506,11 +527,12 @@ func cmdInfo(cmd *cobra.Command, args []string) error {
 
 const codeBad uint32 = 10
 
+// Set an option on the application
 func cmdSetOption(cmd *cobra.Command, args []string) error {
 	if len(args) < 2 {
 		printResponse(cmd, args, response{
-			Code:	codeBad,
-			Log:	"want at least arguments of the form: <key> <value>",
+			Code: codeBad,
+			Log:  "want at least arguments of the form: <key> <value>",
 		})
 		return nil
 	}
@@ -520,15 +542,16 @@ func cmdSetOption(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	printResponse(cmd, args, response{Log: "OK (SetOption doesn't return anything.)"})
+	printResponse(cmd, args, response{Log: "OK (SetOption doesn't return anything.)"}) // NOTE: Nothing to show...
 	return nil
 }
 
+// Append a new tx to application
 func cmdDeliverTx(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		printResponse(cmd, args, response{
-			Code:	codeBad,
-			Log:	"want the tx",
+			Code: codeBad,
+			Log:  "want the tx",
 		})
 		return nil
 	}
@@ -541,19 +564,20 @@ func cmdDeliverTx(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	printResponse(cmd, args, response{
-		Code:	res.Code,
-		Data:	[]byte(res.Data),
-		Info:	res.Info,
-		Log:	res.Log,
+		Code: res.Code,
+		Data: []byte(res.Data),
+		Info: res.Info,
+		Log:  res.Log,
 	})
 	return nil
 }
 
+// Validate a tx
 func cmdCheckTx(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		printResponse(cmd, args, response{
-			Code:	codeBad,
-			Info:	"want the tx",
+			Code: codeBad,
+			Info: "want the tx",
 		})
 		return nil
 	}
@@ -566,31 +590,33 @@ func cmdCheckTx(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	printResponse(cmd, args, response{
-		Code:	res.Code,
-		Data:	[]byte(res.Data),
-		Info:	res.Info,
-		Log:	res.Log,
+		Code: res.Code,
+		Data: []byte(res.Data),
+		Info: res.Info,
+		Log:  res.Log,
 	})
 	return nil
 }
 
+// Get application Merkle root hash
 func cmdCommit(cmd *cobra.Command, args []string) error {
 	res, err := client.CommitSync()
 	if err != nil {
 		return err
 	}
 	printResponse(cmd, args, response{
-		Data: res.LastAppHash,
+		Data: res.GetLastAppHash(),
 	})
 	return nil
 }
 
+// Query application state
 func cmdQuery(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		printResponse(cmd, args, response{
-			Code:	codeBad,
-			Info:	"want the query",
-			Log:	"",
+			Code: codeBad,
+			Info: "want the query",
+			Log:  "",
 		})
 		return nil
 	}
@@ -600,23 +626,23 @@ func cmdQuery(cmd *cobra.Command, args []string) error {
 	}
 
 	resQuery, err := client.QuerySync(types.RequestQuery{
-		Data:	queryBytes,
-		Path:	flagPath,
-		Height:	int64(flagHeight),
-		Prove:	flagProve,
+		Data:   queryBytes,
+		Path:   flagPath,
+		Height: int64(flagHeight),
+		Prove:  flagProve,
 	})
 	if err != nil {
 		return err
 	}
 	printResponse(cmd, args, response{
-		Code:	resQuery.Code,
-		Info:	resQuery.Info,
-		Log:	resQuery.Log,
+		Code: resQuery.Code,
+		Info: resQuery.Info,
+		Log:  resQuery.Log,
 		Query: &queryResponse{
-			Key:	resQuery.Key,
-			Value:	resQuery.Value,
-			Height:	resQuery.Height,
-			Proof:	resQuery.Proof,
+			Key:    resQuery.Key,
+			Value:  resQuery.Value,
+			Height: resQuery.Height,
+			Proof:  resQuery.Proof,
 		},
 	})
 	return nil
@@ -628,6 +654,7 @@ func cmdCounter(cmd *cobra.Command, args []string) error {
 
 	logger := log.NewTMLogger("./log", "counter")
 
+	// Start the listener
 	srv, err := server.NewServer(flagAddrC, flagAbci, app)
 	if err != nil {
 		return err
@@ -637,8 +664,9 @@ func cmdCounter(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Wait forever
 	cmn.TrapSignal(func(signal os.Signal) {
-
+		// Cleanup
 		srv.Stop()
 	})
 	return nil
@@ -647,6 +675,7 @@ func cmdCounter(cmd *cobra.Command, args []string) error {
 func cmdKVStore(cmd *cobra.Command, args []string) error {
 	logger := log.NewTMLogger("./log", "KVStore")
 
+	// Create the application - in memory or persisted to disk
 	var app types.Application
 	if flagPersist == "" {
 		app = kvstore.NewKVStoreApplication()
@@ -655,6 +684,7 @@ func cmdKVStore(cmd *cobra.Command, args []string) error {
 		app.(*kvstore.PersistentKVStoreApplication).SetLogger(logger.With("module", "kvstore"))
 	}
 
+	// Start the listener
 	srv, err := server.NewServer(flagAddrD, flagAbci, app)
 	if err != nil {
 		return err
@@ -664,12 +694,15 @@ func cmdKVStore(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Wait forever
 	cmn.TrapSignal(func(signal os.Signal) {
-
+		// Cleanup
 		srv.Stop()
 	})
 	return nil
 }
+
+//--------------------------------------------------------------------------------
 
 func printResponse(cmd *cobra.Command, args []string, rsp response) {
 
@@ -677,6 +710,7 @@ func printResponse(cmd *cobra.Command, args []string, rsp response) {
 		fmt.Println(">", cmd.Use, strings.Join(args, " "))
 	}
 
+	// Always print the status code.
 	if rsp.Code == types.CodeTypeOK {
 		fmt.Printf("-> code: OK\n")
 	} else {
@@ -685,7 +719,8 @@ func printResponse(cmd *cobra.Command, args []string, rsp response) {
 	}
 
 	if len(rsp.Data) != 0 {
-
+		// Do no print this line when using the commit command
+		// because the string comes out as gibberish
 		if cmd.Use != "commit" {
 			fmt.Printf("-> data: %s\n", rsp.Data)
 		}
@@ -711,6 +746,7 @@ func printResponse(cmd *cobra.Command, args []string, rsp response) {
 	}
 }
 
+// NOTE: s is interpreted as a string unless prefixed with 0x
 func stringOrHexToBytes(s string) ([]byte, error) {
 	if len(s) > 2 && strings.ToLower(s[:2]) == "0x" {
 		b, err := hex.DecodeString(s[2:])

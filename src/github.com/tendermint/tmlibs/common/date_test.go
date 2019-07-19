@@ -8,19 +8,19 @@ import (
 )
 
 var (
-	date	= time.Date(2015, time.Month(12), 31, 0, 0, 0, 0, time.UTC)
-	date2	= time.Date(2016, time.Month(12), 31, 0, 0, 0, 0, time.UTC)
-	zero	time.Time
+	date  = time.Date(2015, time.Month(12), 31, 0, 0, 0, 0, time.UTC)
+	date2 = time.Date(2016, time.Month(12), 31, 0, 0, 0, 0, time.UTC)
+	zero  time.Time
 )
 
 func TestParseDateRange(t *testing.T) {
 	assert := assert.New(t)
 
 	var testDates = []struct {
-		dateStr	string
-		start	time.Time
-		end	time.Time
-		errNil	bool
+		dateStr string
+		start   time.Time
+		end     time.Time
+		errNil  bool
 	}{
 		{"2015-12-31:2016-12-31", date, date2, true},
 		{"2015-12-31:", date, zero, true},

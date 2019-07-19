@@ -1,3 +1,27 @@
+/*
+Computes a deterministic minimal height merkle tree hash.
+If the number of items is not a power of two, some leaves
+will be at different levels. Tries to keep both sides of
+the tree the same size, but the left may be one greater.
+
+Use this for short deterministic trees, such as the validator list.
+For larger datasets, use IAVLTree.
+
+                        *
+                       / \
+                     /     \
+                   /         \
+                 /             \
+                *               *
+               / \             / \
+              /   \           /   \
+             /     \         /     \
+            *       *       *       h6
+           / \     / \     / \
+          h0  h1  h2  h3  h4  h5
+
+*/
+
 package merkle
 
 import (
@@ -18,7 +42,7 @@ func SimpleHashFromTwoHashes(left []byte, right []byte) []byte {
 }
 
 func SimpleHashFromHashes(hashes [][]byte) []byte {
-
+	// Recursive impl.
 	switch len(hashes) {
 	case 0:
 		return nil
@@ -30,6 +54,10 @@ func SimpleHashFromHashes(hashes [][]byte) []byte {
 		return SimpleHashFromTwoHashes(left, right)
 	}
 }
+
+// NOTE: Do not implement this, use SimpleHashFromByteslices instead.
+// type Byteser interface { Bytes() []byte }
+// func SimpleHashFromBytesers(items []Byteser) []byte { ... }
 
 func SimpleHashFromByteslices(bzs [][]byte) []byte {
 	hashes := make([][]byte, len(bzs))

@@ -20,6 +20,8 @@ func (NopEventBus) UnsubscribeAll(ctx context.Context, subscriber string) error 
 	return nil
 }
 
+//--- block, tx, and vote events
+
 func (NopEventBus) PublishEventNewBlock(block EventDataNewBlock) error {
 	return nil
 }
@@ -35,6 +37,8 @@ func (NopEventBus) PublishEventVote(vote EventDataVote) error {
 func (NopEventBus) PublishEventTx(tx EventDataTx) error {
 	return nil
 }
+
+//--- EventDataRoundState events
 
 func (NopEventBus) PublishEventNewRoundStep(rs EventDataRoundState) error {
 	return nil

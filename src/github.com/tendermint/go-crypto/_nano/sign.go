@@ -8,24 +8,25 @@ import (
 )
 
 const (
-	App		= 0x80
-	Init		= 0x00
-	Update		= 0x01
-	Digest		= 0x02
-	MaxChunk	= 253
-	KeyLength	= 32
-	SigLength	= 64
+	App       = 0x80
+	Init      = 0x00
+	Update    = 0x01
+	Digest    = 0x02
+	MaxChunk  = 253
+	KeyLength = 32
+	SigLength = 64
 )
 
 var separator = []byte{0, 0xCA, 0xFE, 0}
 
 func generateSignRequests(payload []byte) [][]byte {
-
+	// nice one-shot
 	digest := []byte{App, Digest}
 	if len(payload) < MaxChunk {
 		return [][]byte{append(digest, payload...)}
 	}
 
+	// large payload is multi-chunk
 	result := [][]byte{{App, Init}}
 	update := []byte{App, Update}
 	for len(payload) > MaxChunk {

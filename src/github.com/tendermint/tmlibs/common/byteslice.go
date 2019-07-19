@@ -4,6 +4,9 @@ import (
 	"bytes"
 )
 
+// Fingerprint returns the first 6 bytes of a byte slice.
+// If the slice is less than 6 bytes, the fingerprint
+// contains trailing zeroes.
 func Fingerprint(slice []byte) []byte {
 	fingerprint := make([]byte, 6)
 	copy(fingerprint, slice)
@@ -43,6 +46,8 @@ func TrimmedString(b []byte) string {
 
 }
 
+// PrefixEndBytes returns the end byteslice for a noninclusive range
+// that would include all byte slices for which the input is the prefix
 func PrefixEndBytes(prefix []byte) []byte {
 	if prefix == nil {
 		return nil

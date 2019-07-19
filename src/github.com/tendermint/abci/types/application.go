@@ -1,22 +1,32 @@
-package types
+package types // nolint: goimports
 
 import (
-	context "golang.org/x/net/context"
+	"golang.org/x/net/context"
 )
 
+// Application is an interface that enables any finite, deterministic state machine
+// to be driven by a blockchain-based replication engine via the ABCI.
+// All methods take a RequestXxx argument and return a ResponseXxx argument,
+// except CheckTx/DeliverTx, which take `tx []byte`, and `Commit`, which takes nothing.
 type Application interface {
-	Info(RequestInfo) ResponseInfo
-	SetOption(RequestSetOption) ResponseSetOption
-	Query(RequestQuery) ResponseQuery
+	// Info/Query Connection
+	Info(RequestInfo) ResponseInfo                // Return application info
+	SetOption(RequestSetOption) ResponseSetOption // Set application option
+	Query(RequestQuery) ResponseQuery             // Query for state
 
-	CheckTx(tx []byte) ResponseCheckTx
+	// Mempool Connection
+	CheckTx(tx []byte) ResponseCheckTx // Validate a tx for the mempool
 
-	InitChain(RequestInitChain) ResponseInitChain
-	BeginBlock(RequestBeginBlock) ResponseBeginBlock
-	DeliverTx(tx []byte) ResponseDeliverTx
-	EndBlock(RequestEndBlock) ResponseEndBlock
-	Commit() ResponseCommit
+	// Consensus Connection
+	InitChain(RequestInitChain) ResponseInitChain    // Initialize blockchain with validators and other info from TendermintCore
+	BeginBlock(RequestBeginBlock) ResponseBeginBlock // Signals the beginning of a block
+	DeliverTx(tx []byte) ResponseDeliverTx           // Deliver a tx for full processing
+	EndBlock(RequestEndBlock) ResponseEndBlock       // Signals the end of a block, returns changes to the validator set
+	Commit() ResponseCommit                          // Commit the state and return the application Merkle root hash
 }
+
+//-------------------------------------------------------
+// BaseApplication is a base form of Application
 
 var _ Application = (*BaseApplication)(nil)
 
@@ -32,7 +42,7 @@ func (BaseApplication) Info(req RequestInfo) ResponseInfo {
 }
 
 func (BaseApplication) SetOption(req RequestSetOption) ResponseSetOption {
-	return ResponseSetOption{}
+	return ResponseSetOption{Code: CodeTypeOK}
 }
 
 func (BaseApplication) DeliverTx(tx []byte) ResponseDeliverTx {
@@ -52,17 +62,20 @@ func (BaseApplication) Query(req RequestQuery) ResponseQuery {
 }
 
 func (BaseApplication) InitChain(req RequestInitChain) ResponseInitChain {
-	return ResponseInitChain{}
+	return ResponseInitChain{Code: CodeTypeOK}
 }
 
 func (BaseApplication) BeginBlock(req RequestBeginBlock) ResponseBeginBlock {
-	return ResponseBeginBlock{}
+	return ResponseBeginBlock{Code: CodeTypeOK}
 }
 
 func (BaseApplication) EndBlock(req RequestEndBlock) ResponseEndBlock {
 	return ResponseEndBlock{}
 }
 
+//-------------------------------------------------------
+
+// GRPCApplication is a GRPC wrapper for Application
 type GRPCApplication struct {
 	app Application
 }

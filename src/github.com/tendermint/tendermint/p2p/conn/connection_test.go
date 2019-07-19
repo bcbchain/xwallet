@@ -34,8 +34,8 @@ func createMConnectionWithCallbacks(conn net.Conn, onReceive func(chID byte, msg
 
 func TestMConnectionSend(t *testing.T) {
 	server, client := NetPipe()
-	defer server.Close()
-	defer client.Close()
+	defer server.Close() // nolint: errcheck
+	defer client.Close() // nolint: errcheck
 
 	mconn := createTestMConnection(client)
 	err := mconn.Start()
@@ -44,7 +44,8 @@ func TestMConnectionSend(t *testing.T) {
 
 	msg := []byte("Ant-Man")
 	assert.True(t, mconn.Send(0x01, msg))
-
+	// Note: subsequent Send/TrySend calls could pass because we are reading from
+	// the send queue in a separate goroutine.
 	_, err = server.Read(make([]byte, len(msg)))
 	if err != nil {
 		t.Error(err)
@@ -64,8 +65,8 @@ func TestMConnectionSend(t *testing.T) {
 
 func TestMConnectionReceive(t *testing.T) {
 	server, client := NetPipe()
-	defer server.Close()
-	defer client.Close()
+	defer server.Close() // nolint: errcheck
+	defer client.Close() // nolint: errcheck
 
 	receivedCh := make(chan []byte)
 	errorsCh := make(chan interface{})
@@ -100,8 +101,8 @@ func TestMConnectionReceive(t *testing.T) {
 
 func TestMConnectionStatus(t *testing.T) {
 	server, client := NetPipe()
-	defer server.Close()
-	defer client.Close()
+	defer server.Close() // nolint: errcheck
+	defer client.Close() // nolint: errcheck
 
 	mconn := createTestMConnection(client)
 	err := mconn.Start()
@@ -133,7 +134,7 @@ func TestMConnectionPongTimeoutResultsInError(t *testing.T) {
 
 	serverGotPing := make(chan struct{})
 	go func() {
-
+		// read ping
 		var pkt PacketPing
 		const maxPacketPingSize = 1024
 		_, err = cdc.UnmarshalBinaryReader(server, &pkt, maxPacketPingSize)
@@ -171,6 +172,7 @@ func TestMConnectionMultiplePongsInTheBeginning(t *testing.T) {
 	require.Nil(t, err)
 	defer mconn.Stop()
 
+	// sending 3 pongs in a row (abuse)
 	_, err = server.Write(cdc.MustMarshalBinary(PacketPong{}))
 	require.Nil(t, err)
 	_, err = server.Write(cdc.MustMarshalBinary(PacketPong{}))
@@ -180,12 +182,12 @@ func TestMConnectionMultiplePongsInTheBeginning(t *testing.T) {
 
 	serverGotPing := make(chan struct{})
 	go func() {
-
+		// read ping (one byte)
 		var packet, err = Packet(nil), error(nil)
 		_, err = cdc.UnmarshalBinaryReader(server, &packet, 1024)
 		require.Nil(t, err)
 		serverGotPing <- struct{}{}
-
+		// respond with pong
 		_, err = server.Write(cdc.MustMarshalBinary(PacketPong{}))
 		require.Nil(t, err)
 	}()
@@ -220,6 +222,8 @@ func TestMConnectionMultiplePings(t *testing.T) {
 	require.Nil(t, err)
 	defer mconn.Stop()
 
+	// sending 3 pings in a row (abuse)
+	// see https://github.com/tendermint/tendermint/issues/1190
 	_, err = server.Write(cdc.MustMarshalBinary(PacketPing{}))
 	require.Nil(t, err)
 	var pkt PacketPong
@@ -257,20 +261,21 @@ func TestMConnectionPingPongs(t *testing.T) {
 
 	serverGotPing := make(chan struct{})
 	go func() {
-
+		// read ping
 		var pkt PacketPing
 		_, err = cdc.UnmarshalBinaryReader(server, &pkt, 1024)
 		require.Nil(t, err)
 		serverGotPing <- struct{}{}
-
+		// respond with pong
 		_, err = server.Write(cdc.MustMarshalBinary(PacketPong{}))
 		require.Nil(t, err)
 
 		time.Sleep(mconn.config.PingInterval)
 
+		// read ping
 		_, err = cdc.UnmarshalBinaryReader(server, &pkt, 1024)
 		require.Nil(t, err)
-
+		// respond with pong
 		_, err = server.Write(cdc.MustMarshalBinary(PacketPong{}))
 		require.Nil(t, err)
 	}()
@@ -289,8 +294,8 @@ func TestMConnectionPingPongs(t *testing.T) {
 
 func TestMConnectionStopsAndReturnsError(t *testing.T) {
 	server, client := NetPipe()
-	defer server.Close()
-	defer client.Close()
+	defer server.Close() // nolint: errcheck
+	defer client.Close() // nolint: errcheck
 
 	receivedCh := make(chan []byte)
 	errorsCh := make(chan interface{})
@@ -326,6 +331,7 @@ func newClientAndServerConnsForReadErrors(t *testing.T, chOnErr chan struct{}) (
 	onReceive := func(chID byte, msgBytes []byte) {}
 	onError := func(r interface{}) {}
 
+	// create client conn with two channels
 	chDescs := []*ChannelDescriptor{
 		{ID: 0x01, Priority: 1, SendQueueCapacity: 1},
 		{ID: 0x02, Priority: 1, SendQueueCapacity: 1},
@@ -335,6 +341,8 @@ func newClientAndServerConnsForReadErrors(t *testing.T, chOnErr chan struct{}) (
 	err := mconnClient.Start()
 	require.Nil(t, err)
 
+	// create server conn with 1 channel
+	// it fires on chOnErr when there's an error
 	serverLogger := log.TestingLogger().With("module", "server")
 	onError = func(r interface{}) {
 		chOnErr <- struct{}{}
@@ -364,9 +372,11 @@ func TestMConnectionReadErrorBadEncoding(t *testing.T) {
 
 	client := mconnClient.conn
 
+	// send badly encoded msgPacket
 	bz := cdc.MustMarshalBinary(PacketMsg{})
-	bz[4] += 0x01
+	bz[4] += 0x01 // Invalid prefix bytes.
 
+	// Write it.
 	_, err := client.Write(bz)
 	assert.Nil(t, err)
 	assert.True(t, expectSend(chOnErr), "badly encoded msgPacket")
@@ -380,8 +390,11 @@ func TestMConnectionReadErrorUnknownChannel(t *testing.T) {
 
 	msg := []byte("Ant-Man")
 
+	// fail to send msg on channel unknown by client
 	assert.False(t, mconnClient.Send(0x03, msg))
 
+	// send msg on channel unknown by the server.
+	// should cause an error
 	assert.True(t, mconnClient.Send(0x02, msg))
 	assert.True(t, expectSend(chOnErr), "unknown channel")
 }
@@ -400,13 +413,22 @@ func TestMConnectionReadErrorLongMessage(t *testing.T) {
 
 	client := mconnClient.conn
 
+	// send msg thats just right
 	var err error
 	var buf = new(bytes.Buffer)
-
+	// - Uvarint length of MustMarshalBinary(packet) = 1 or 2 bytes
+	//   (as long as it's less than 16,384 bytes)
+	// - Prefix bytes = 4 bytes
+	// - ChannelID field key + byte = 2 bytes
+	// - EOF field key + byte = 2 bytes
+	// - Bytes field key = 1 bytes
+	// - Uvarint length of MustMarshalBinary(bytes) = 1 or 2 bytes
+	// - Struct terminator = 1 byte
+	// = up to 14 bytes overhead for the packet.
 	var packet = PacketMsg{
-		ChannelID:	0x01,
-		EOF:		1,
-		Bytes:		make([]byte, mconnClient.config.MaxPacketMsgPayloadSize),
+		ChannelID: 0x01,
+		EOF:       1,
+		Bytes:     make([]byte, mconnClient.config.MaxPacketMsgPayloadSize),
 	}
 	_, err = cdc.MarshalBinaryWriter(buf, packet)
 	assert.Nil(t, err)
@@ -415,11 +437,12 @@ func TestMConnectionReadErrorLongMessage(t *testing.T) {
 	assert.True(t, expectSend(chOnRcv), "msg just right")
 	assert.False(t, expectSend(chOnErr), "msg just right")
 
+	// send msg thats too long
 	buf = new(bytes.Buffer)
 	packet = PacketMsg{
-		ChannelID:	0x01,
-		EOF:		1,
-		Bytes:		make([]byte, mconnClient.config.MaxPacketMsgPayloadSize+1),
+		ChannelID: 0x01,
+		EOF:       1,
+		Bytes:     make([]byte, mconnClient.config.MaxPacketMsgPayloadSize+1),
 	}
 	_, err = cdc.MarshalBinaryWriter(buf, packet)
 	assert.Nil(t, err)
@@ -435,6 +458,7 @@ func TestMConnectionReadErrorUnknownMsgType(t *testing.T) {
 	defer mconnClient.Stop()
 	defer mconnServer.Stop()
 
+	// send msg with unknown msg type
 	err := error(nil)
 	err = amino.EncodeUvarint(mconnClient.conn, 4)
 	assert.Nil(t, err)

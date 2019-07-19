@@ -1,0 +1,34 @@
+#区块链标识
+chainID: "bcb"
+
+#区块链版本
+chainVersion: 1
+
+# 本地服务监听地址:端口
+serverAddr: "tcp://0.0.0.0:37657"
+
+# 是否使用https
+useHttps: false
+
+# 外部证书路径
+outCerPath: "./.config/Xwallet.web.rpc"
+
+#日志配置信息
+loggerScreen: true
+loggerFile: true
+loggerLevel: "debug"
+
+# 账户数据库存位置
+keyStorePath: "./.keystore"
+
+#指定创智区块链节点的接入URL，热钱包需要此参数，冷钱包可以忽略此参数；
+nodeAddrSlice:
+    - "https://earth.bcbchain.io"
+    - "https://mars.bcbchain.io"
+    - "https://mercury.bcbchain.io"
+    - "https://jupiter.bcbchain.io"
+    - "https://venus.bcbchain.io"
+    - "https://moon.bcbchain.io"
+    - "https://sirius.bcbchain.io"
+    - "https://vaga.bcbchain.io"
+    - "https://altair.bcbchain.io"

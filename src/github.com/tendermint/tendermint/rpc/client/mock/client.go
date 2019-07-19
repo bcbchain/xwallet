@@ -1,3 +1,16 @@
+/*
+package mock returns a Client implementation that
+accepts various (mock) implementations of the various methods.
+
+This implementation is useful for using in tests, when you don't
+need a real server, but want a high-level of control about
+the server response you want to mock (eg. error handling),
+or if you just want to record the calls to verify in your tests.
+
+For real clients, you probably want the "http" package.  If you
+want to directly call a tendermint node in process, you can use the
+"local" package.
+*/
 package mock
 
 import (
@@ -10,6 +23,11 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+// Client wraps arbitrary implementations of the various interfaces.
+//
+// We provide a few choices to mock out each one in this package.
+// Nothing hidden here, so no New function, just construct it from
+// some parts, and swap them out them during the tests.
 type Client struct {
 	client.ABCIClient
 	client.SignClient
@@ -21,26 +39,35 @@ type Client struct {
 
 var _ client.Client = Client{}
 
+// Call is used by recorders to save a call and response.
+// It can also be used to configure mock responses.
+//
 type Call struct {
-	Name		string
-	Args		interface{}
-	Response	interface{}
-	Error		error
+	Name     string
+	Args     interface{}
+	Response interface{}
+	Error    error
 }
 
+// GetResponse will generate the apporiate response for us, when
+// using the Call struct to configure a Mock handler.
+//
+// When configuring a response, if only one of Response or Error is
+// set then that will always be returned. If both are set, then
+// we return Response if the Args match the set args, Error otherwise.
 func (c Call) GetResponse(args interface{}) (interface{}, error) {
-
+	// handle the case with no response
 	if c.Response == nil {
 		if c.Error == nil {
 			panic("Misconfigured call, you must set either Response or Error")
 		}
 		return nil, c.Error
 	}
-
+	// response without error
 	if c.Error == nil {
 		return c.Response, nil
 	}
-
+	// have both, we must check args....
 	if reflect.DeepEqual(args, c.Args) {
 		return c.Response, nil
 	}

@@ -22,6 +22,7 @@ func ReadByteSlice(r io.Reader, lmt int, n *int, err *error) []byte {
 		return nil
 	}
 
+	// check that length is less than the maximum slice size
 	if length > math.MaxInt32 {
 		*err = ErrBinaryReadOverflow
 		return nil
@@ -30,6 +31,10 @@ func ReadByteSlice(r io.Reader, lmt int, n *int, err *error) []byte {
 		*err = ErrBinaryReadOverflow
 		return nil
 	}
+
+	/*	if length == 0 {
+		return nil // zero value for []byte
+	}*/
 
 	buf := make([]byte, length)
 	ReadFull(buf, r, n, err)
@@ -69,9 +74,12 @@ func GetByteSlice(buf []byte) (bz []byte, n int, err error) {
 	return buf2, n + length, nil
 }
 
+// Returns the total encoded size of a byteslice
 func ByteSliceSize(bz []byte) int {
 	return UvarintSize(uint64(len(bz))) + len(bz)
 }
+
+//-----------------------------------------------------------------------------
 
 func WriteByteSlices(bzz [][]byte, w io.Writer, n *int, err *error) {
 	WriteVarint(len(bzz), w, n, err)

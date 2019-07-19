@@ -8,10 +8,12 @@ import (
 )
 
 var (
-	BTCEncoder	data.ByteEncoder	= base58Encoder{BTCAlphabet}
-	FlickrEncoder				= base58Encoder{FlickrAlphabet}
+	BTCEncoder    data.ByteEncoder = base58Encoder{BTCAlphabet}
+	FlickrEncoder                  = base58Encoder{FlickrAlphabet}
 )
 
+// base58Encoder implements ByteEncoder encoding the slice as
+// base58 url-safe encoding
 type base58Encoder struct {
 	alphabet string
 }

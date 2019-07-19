@@ -6,11 +6,20 @@ import (
 	"time"
 )
 
+//----------------------------------------
+// Constants
+
 const printLog = false
 
-const RFC3339Millis = "2006-01-02T15:04:05.000Z"
-
+const RFC3339Millis = "2006-01-02T15:04:05.000Z" // forced microseconds
 var timeType = reflect.TypeOf(time.Time{})
+
+//----------------------------------------
+// encode: see binary-encode.go and json-encode.go
+// decode: see binary-decode.go and json-decode.go
+
+//----------------------------------------
+// Misc.
 
 func getTypeFromPointer(ptr interface{}) reflect.Type {
 	rt := reflect.TypeOf(ptr)
@@ -30,6 +39,8 @@ func checkUnsafe(field FieldInfo) {
 	}
 }
 
+// CONTRACT: by the time this is called, len(bz) >= _n
+// Returns true so you can write one-liners.
 func slide(bz *[]byte, n *int, _n int) bool {
 	if _n < 0 || _n > len(*bz) {
 		panic(fmt.Sprintf("impossible slide: len:%v _n:%v", len(*bz), _n))
@@ -39,6 +50,10 @@ func slide(bz *[]byte, n *int, _n int) bool {
 	return true
 }
 
+// Dereference pointer recursively.
+// drv: the final non-pointer value (which may be invalid).
+// isPtr: whether rv.Kind() == reflect.Ptr.
+// isNilPtr: whether a nil pointer at any level.
 func derefPointers(rv reflect.Value) (drv reflect.Value, isPtr bool, isNilPtr bool) {
 	for rv.Kind() == reflect.Ptr {
 		isPtr = true
@@ -52,6 +67,8 @@ func derefPointers(rv reflect.Value) (drv reflect.Value, isPtr bool, isNilPtr bo
 	return
 }
 
+// Returns isVoid=true iff is ultimately nil or empty after (recursive) dereferencing.
+// If isVoid=false, erv is set to the non-nil non-empty valid dereferenced value.
 func isVoid(rv reflect.Value) (erv reflect.Value, isVoid bool) {
 	rv, _, isNilPtr := derefPointers(rv)
 	if isNilPtr {
@@ -70,8 +87,11 @@ func isVoid(rv reflect.Value) (erv reflect.Value, isVoid bool) {
 	}
 }
 
+// constructConcreteType creates the concrete value as
+// well as the corresponding settable value for it.
+// Return irvSet which should be set on caller's interface rv.
 func constructConcreteType(cinfo *TypeInfo) (crv, irvSet reflect.Value) {
-
+	// Construct new concrete type.
 	if cinfo.PointerPreferred {
 		cPtrRv := reflect.New(cinfo.Type)
 		crv = cPtrRv.Elem()
@@ -83,22 +103,27 @@ func constructConcreteType(cinfo *TypeInfo) (crv, irvSet reflect.Value) {
 	return
 }
 
+// Like typeToTyp4 but include a pointer bit.
 func typeToTyp4(rt reflect.Type, opts FieldOptions) (typ Typ4) {
 
+	// Dereference pointer type.
 	var pointer = false
 	for rt.Kind() == reflect.Ptr {
 		pointer = true
 		rt = rt.Elem()
 	}
 
+	// Call actual logic.
 	typ = Typ4(typeToTyp3(rt, opts))
 
+	// Set pointer bit to 1 if pointer.
 	if pointer {
 		typ |= Typ4_Pointer
 	}
 	return
 }
 
+// CONTRACT: rt.Kind() != reflect.Ptr
 func typeToTyp3(rt reflect.Type, opts FieldOptions) Typ3 {
 	switch rt.Kind() {
 	case reflect.Interface:

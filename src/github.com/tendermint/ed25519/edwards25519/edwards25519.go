@@ -1,5 +1,19 @@
+// Copyright 2013 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Package edwards25519 implements operations in GF(2**255-19) and on an
+// Edwards curve that is isomorphic to curve25519. See
+// http://ed25519.cr.yp.to/.
 package edwards25519
 
+// This code is a port of the public domain, "ref10" implementation of ed25519
+// from SUPERCOP.
+
+// FieldElement represents an element of the field GF(2^255 - 19).  An element
+// t, entries t[0]...t[9], represents the integer t[0]+2^26 t[1]+2^51 t[2]+2^77
+// t[3]+2^102 t[4]+...+2^230 t[9].  Bounds on each t[i] vary depending on
+// context.
 type FieldElement [10]int32
 
 var zero FieldElement
@@ -43,6 +57,10 @@ func FeCopy(dst, src *FieldElement) {
 	copy(dst[:], src[:])
 }
 
+// Replace (f,g) with (g,g) if b == 1;
+// replace (f,g) with (f,g) if b == 0.
+//
+// Preconditions: b in {0,1}.
 func FeCMove(f, g *FieldElement, b int32) {
 	b = -b
 	f[0] ^= b & (f[0] ^ g[0])
@@ -89,6 +107,29 @@ func FeFromBytes(dst *FieldElement, src *[32]byte) {
 	FeCombine(dst, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9)
 }
 
+// FeToBytes marshals h to s.
+// Preconditions:
+//   |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
+//
+// Write p=2^255-19; q=floor(h/p).
+// Basic claim: q = floor(2^(-255)(h + 19 2^(-25)h9 + 2^(-1))).
+//
+// Proof:
+//   Have |h|<=p so |q|<=1 so |19^2 2^(-255) q|<1/4.
+//   Also have |h-2^230 h9|<2^230 so |19 2^(-255)(h-2^230 h9)|<1/4.
+//
+//   Write y=2^(-1)-19^2 2^(-255)q-19 2^(-255)(h-2^230 h9).
+//   Then 0<y<1.
+//
+//   Write r=h-pq.
+//   Have 0<=r<=p-1=2^255-20.
+//   Thus 0<=r+19(2^-255)r<r+19(2^-255)2^255<=2^255-1.
+//
+//   Write x=r+19(2^-255)r+y.
+//   Then 0<x<2^255 so floor(2^(-255)x) = 0 so floor(q+2^(-255)x) = q.
+//
+//   Have q+2^(-255)x = 2^(-255)(h + 19 2^(-25) h9 + 2^(-1))
+//   so floor(2^(-255)(h + 19 2^(-25) h9 + 2^(-1))) = q.
 func FeToBytes(s *[32]byte, h *FieldElement) {
 	var carry [10]int32
 
@@ -104,7 +145,9 @@ func FeToBytes(s *[32]byte, h *FieldElement) {
 	q = (h[8] + q) >> 26
 	q = (h[9] + q) >> 25
 
+	// Goal: Output h-(2^255-19)q, which is between 0 and 2^255-20.
 	h[0] += 19 * q
+	// Goal: Output h-2^255 q, which is between 0 and 2^255-20.
 
 	carry[0] = h[0] >> 26
 	h[1] += carry[0]
@@ -135,6 +178,12 @@ func FeToBytes(s *[32]byte, h *FieldElement) {
 	h[8] -= carry[8] << 26
 	carry[9] = h[9] >> 25
 	h[9] -= carry[9] << 25
+	// h10 = carry9
+
+	// Goal: Output h[0]+...+2^255 h10-2^255 q, which is between 0 and 2^255-20.
+	// Have h[0]+...+2^230 h[9] between 0 and 2^255-1;
+	// evidently 2^255 h10-2^255 q = 0.
+	// Goal: Output h[0]+...+2^230 h[9].
 
 	s[0] = byte(h[0] >> 0)
 	s[1] = byte(h[0] >> 8)
@@ -189,6 +238,13 @@ func FeIsNonZero(f *FieldElement) int32 {
 	return int32(x & 1)
 }
 
+// FeNeg sets h = -f
+//
+// Preconditions:
+//    |f| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
+//
+// Postconditions:
+//    |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
 func FeNeg(h, f *FieldElement) {
 	h[0] = -f[0]
 	h[1] = -f[1]
@@ -205,12 +261,23 @@ func FeNeg(h, f *FieldElement) {
 func FeCombine(h *FieldElement, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9 int64) {
 	var c0, c1, c2, c3, c4, c5, c6, c7, c8, c9 int64
 
+	/*
+	  |h0| <= (1.1*1.1*2^52*(1+19+19+19+19)+1.1*1.1*2^50*(38+38+38+38+38))
+	    i.e. |h0| <= 1.2*2^59; narrower ranges for h2, h4, h6, h8
+	  |h1| <= (1.1*1.1*2^51*(1+1+19+19+19+19+19+19+19+19))
+	    i.e. |h1| <= 1.5*2^58; narrower ranges for h3, h5, h7, h9
+	*/
+
 	c0 = (h0 + (1 << 25)) >> 26
 	h1 += c0
 	h0 -= c0 << 26
 	c4 = (h4 + (1 << 25)) >> 26
 	h5 += c4
 	h4 -= c4 << 26
+	/* |h0| <= 2^25 */
+	/* |h4| <= 2^25 */
+	/* |h1| <= 1.51*2^58 */
+	/* |h5| <= 1.51*2^58 */
 
 	c1 = (h1 + (1 << 24)) >> 25
 	h2 += c1
@@ -218,6 +285,10 @@ func FeCombine(h *FieldElement, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9 int64) {
 	c5 = (h5 + (1 << 24)) >> 25
 	h6 += c5
 	h5 -= c5 << 25
+	/* |h1| <= 2^24; from now on fits into int32 */
+	/* |h5| <= 2^24; from now on fits into int32 */
+	/* |h2| <= 1.21*2^59 */
+	/* |h6| <= 1.21*2^59 */
 
 	c2 = (h2 + (1 << 25)) >> 26
 	h3 += c2
@@ -225,6 +296,10 @@ func FeCombine(h *FieldElement, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9 int64) {
 	c6 = (h6 + (1 << 25)) >> 26
 	h7 += c6
 	h6 -= c6 << 26
+	/* |h2| <= 2^25; from now on fits into int32 unchanged */
+	/* |h6| <= 2^25; from now on fits into int32 unchanged */
+	/* |h3| <= 1.51*2^58 */
+	/* |h7| <= 1.51*2^58 */
 
 	c3 = (h3 + (1 << 24)) >> 25
 	h4 += c3
@@ -232,6 +307,10 @@ func FeCombine(h *FieldElement, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9 int64) {
 	c7 = (h7 + (1 << 24)) >> 25
 	h8 += c7
 	h7 -= c7 << 25
+	/* |h3| <= 2^24; from now on fits into int32 unchanged */
+	/* |h7| <= 2^24; from now on fits into int32 unchanged */
+	/* |h4| <= 1.52*2^33 */
+	/* |h8| <= 1.52*2^33 */
 
 	c4 = (h4 + (1 << 25)) >> 26
 	h5 += c4
@@ -239,14 +318,22 @@ func FeCombine(h *FieldElement, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9 int64) {
 	c8 = (h8 + (1 << 25)) >> 26
 	h9 += c8
 	h8 -= c8 << 26
+	/* |h4| <= 2^25; from now on fits into int32 unchanged */
+	/* |h8| <= 2^25; from now on fits into int32 unchanged */
+	/* |h5| <= 1.01*2^24 */
+	/* |h9| <= 1.51*2^58 */
 
 	c9 = (h9 + (1 << 24)) >> 25
 	h0 += c9 * 19
 	h9 -= c9 << 25
+	/* |h9| <= 2^24; from now on fits into int32 unchanged */
+	/* |h0| <= 1.8*2^37 */
 
 	c0 = (h0 + (1 << 25)) >> 26
 	h1 += c0
 	h0 -= c0 << 26
+	/* |h0| <= 2^25; from now on fits into int32 unchanged */
+	/* |h1| <= 1.01*2^24 */
 
 	h[0] = int32(h0)
 	h[1] = int32(h1)
@@ -260,6 +347,33 @@ func FeCombine(h *FieldElement, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9 int64) {
 	h[9] = int32(h9)
 }
 
+// FeMul calculates h = f * g
+// Can overlap h with f or g.
+//
+// Preconditions:
+//    |f| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
+//    |g| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
+//
+// Postconditions:
+//    |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
+//
+// Notes on implementation strategy:
+//
+// Using schoolbook multiplication.
+// Karatsuba would save a little in some cost models.
+//
+// Most multiplications by 2 and 19 are 32-bit precomputations;
+// cheaper than 64-bit postcomputations.
+//
+// There is one remaining multiplication by 19 in the carry chain;
+// one *19 precomputation can be merged into this,
+// but the resulting data flow is considerably less clean.
+//
+// There are 12 carries below.
+// 10 of them are 2-way parallelizable and vectorizable.
+// Can get away with 11 carries, but then data flow is much deeper.
+//
+// With tighter constraints on inputs can squeeze carries into int32.
 func FeMul(h, f, g *FieldElement) {
 	f0 := int64(f[0])
 	f1 := int64(f[1])
@@ -289,8 +403,8 @@ func FeMul(h, f, g *FieldElement) {
 	g8 := int64(g[8])
 	g9 := int64(g[9])
 
-	g1_19 := int64(19 * g[1])
-	g2_19 := int64(19 * g[2])
+	g1_19 := int64(19 * g[1]) /* 1.4*2^29 */
+	g2_19 := int64(19 * g[2]) /* 1.4*2^30; still ok */
 	g3_19 := int64(19 * g[3])
 	g4_19 := int64(19 * g[4])
 	g5_19 := int64(19 * g[5])
@@ -332,11 +446,11 @@ func feSquare(f *FieldElement) (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9 int64) {
 	f5_2 := int64(2 * f[5])
 	f6_2 := int64(2 * f[6])
 	f7_2 := int64(2 * f[7])
-	f5_38 := 38 * f5
-	f6_19 := 19 * f6
-	f7_38 := 38 * f7
-	f8_19 := 19 * f8
-	f9_38 := 38 * f9
+	f5_38 := 38 * f5 // 1.31*2^30
+	f6_19 := 19 * f6 // 1.31*2^30
+	f7_38 := 38 * f7 // 1.31*2^30
+	f8_19 := 19 * f8 // 1.31*2^30
+	f9_38 := 38 * f9 // 1.31*2^30
 
 	h0 = f0*f0 + f1_2*f9_38 + f2_2*f8_19 + f3_2*f7_38 + f4_2*f6_19 + f5*f5_38
 	h1 = f0_2*f1 + f2*f9_38 + f3_2*f8_19 + f4*f7_38 + f5_2*f6_19
@@ -352,11 +466,28 @@ func feSquare(f *FieldElement) (h0, h1, h2, h3, h4, h5, h6, h7, h8, h9 int64) {
 	return
 }
 
+// FeSquare calculates h = f*f. Can overlap h with f.
+//
+// Preconditions:
+//    |f| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
+//
+// Postconditions:
+//    |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
 func FeSquare(h, f *FieldElement) {
 	h0, h1, h2, h3, h4, h5, h6, h7, h8, h9 := feSquare(f)
 	FeCombine(h, h0, h1, h2, h3, h4, h5, h6, h7, h8, h9)
 }
 
+// FeSquare2 sets h = 2 * f * f
+//
+// Can overlap h with f.
+//
+// Preconditions:
+//    |f| bounded by 1.65*2^26,1.65*2^25,1.65*2^26,1.65*2^25,etc.
+//
+// Postconditions:
+//    |h| bounded by 1.01*2^25,1.01*2^24,1.01*2^25,1.01*2^24,etc.
+// See fe_mul.c for discussion of implementation strategy.
 func FeSquare2(h, f *FieldElement) {
 	h0, h1, h2, h3, h4, h5, h6, h7, h8, h9 := feSquare(f)
 
@@ -378,55 +509,55 @@ func FeInvert(out, z *FieldElement) {
 	var t0, t1, t2, t3 FieldElement
 	var i int
 
-	FeSquare(&t0, z)
-	FeSquare(&t1, &t0)
-	for i = 1; i < 2; i++ {
+	FeSquare(&t0, z)        // 2^1
+	FeSquare(&t1, &t0)      // 2^2
+	for i = 1; i < 2; i++ { // 2^3
 		FeSquare(&t1, &t1)
 	}
-	FeMul(&t1, z, &t1)
-	FeMul(&t0, &t0, &t1)
-	FeSquare(&t2, &t0)
-	FeMul(&t1, &t1, &t2)
-	FeSquare(&t2, &t1)
-	for i = 1; i < 5; i++ {
+	FeMul(&t1, z, &t1)      // 2^3 + 2^0
+	FeMul(&t0, &t0, &t1)    // 2^3 + 2^1 + 2^0
+	FeSquare(&t2, &t0)      // 2^4 + 2^2 + 2^1
+	FeMul(&t1, &t1, &t2)    // 2^4 + 2^3 + 2^2 + 2^1 + 2^0
+	FeSquare(&t2, &t1)      // 5,4,3,2,1
+	for i = 1; i < 5; i++ { // 9,8,7,6,5
 		FeSquare(&t2, &t2)
 	}
-	FeMul(&t1, &t2, &t1)
-	FeSquare(&t2, &t1)
-	for i = 1; i < 10; i++ {
+	FeMul(&t1, &t2, &t1)     // 9,8,7,6,5,4,3,2,1,0
+	FeSquare(&t2, &t1)       // 10..1
+	for i = 1; i < 10; i++ { // 19..10
 		FeSquare(&t2, &t2)
 	}
-	FeMul(&t2, &t2, &t1)
-	FeSquare(&t3, &t2)
-	for i = 1; i < 20; i++ {
+	FeMul(&t2, &t2, &t1)     // 19..0
+	FeSquare(&t3, &t2)       // 20..1
+	for i = 1; i < 20; i++ { // 39..20
 		FeSquare(&t3, &t3)
 	}
-	FeMul(&t2, &t3, &t2)
-	FeSquare(&t2, &t2)
-	for i = 1; i < 10; i++ {
+	FeMul(&t2, &t3, &t2)     // 39..0
+	FeSquare(&t2, &t2)       // 40..1
+	for i = 1; i < 10; i++ { // 49..10
 		FeSquare(&t2, &t2)
 	}
-	FeMul(&t1, &t2, &t1)
-	FeSquare(&t2, &t1)
-	for i = 1; i < 50; i++ {
+	FeMul(&t1, &t2, &t1)     // 49..0
+	FeSquare(&t2, &t1)       // 50..1
+	for i = 1; i < 50; i++ { // 99..50
 		FeSquare(&t2, &t2)
 	}
-	FeMul(&t2, &t2, &t1)
-	FeSquare(&t3, &t2)
-	for i = 1; i < 100; i++ {
+	FeMul(&t2, &t2, &t1)      // 99..0
+	FeSquare(&t3, &t2)        // 100..1
+	for i = 1; i < 100; i++ { // 199..100
 		FeSquare(&t3, &t3)
 	}
-	FeMul(&t2, &t3, &t2)
-	FeSquare(&t2, &t2)
-	for i = 1; i < 50; i++ {
+	FeMul(&t2, &t3, &t2)     // 199..0
+	FeSquare(&t2, &t2)       // 200..1
+	for i = 1; i < 50; i++ { // 249..50
 		FeSquare(&t2, &t2)
 	}
-	FeMul(&t1, &t2, &t1)
-	FeSquare(&t1, &t1)
-	for i = 1; i < 5; i++ {
+	FeMul(&t1, &t2, &t1)    // 249..0
+	FeSquare(&t1, &t1)      // 250..1
+	for i = 1; i < 5; i++ { // 254..5
 		FeSquare(&t1, &t1)
 	}
-	FeMul(out, &t1, &t0)
+	FeMul(out, &t1, &t0) // 254..5,3,1,0
 }
 
 func fePow22523(out, z *FieldElement) {
@@ -489,6 +620,15 @@ func fePow22523(out, z *FieldElement) {
 	}
 	FeMul(out, &t0, z)
 }
+
+// Group elements are members of the elliptic curve -x^2 + y^2 = 1 + d * x^2 *
+// y^2 where d = -121665/121666.
+//
+// Several representations are used:
+//   ProjectiveGroupElement: (X:Y:Z) satisfying x=X/Z, y=Y/Z
+//   ExtendedGroupElement: (X:Y:Z:T) satisfying x=X/Z, y=Y/Z, XY=ZT
+//   CompletedGroupElement: ((X:Z),(Y:T)) satisfying x=X/Z, y=Y/T
+//   PreComputedGroupElement: (y+x,y-x,2dxy)
 
 type ProjectiveGroupElement struct {
 	X, Y, Z FieldElement
@@ -583,26 +723,26 @@ func (p *ExtendedGroupElement) FromBytes(s *[32]byte) bool {
 	FeOne(&p.Z)
 	FeSquare(&u, &p.Y)
 	FeMul(&v, &u, &d)
-	FeSub(&u, &u, &p.Z)
-	FeAdd(&v, &v, &p.Z)
+	FeSub(&u, &u, &p.Z) // y = y^2-1
+	FeAdd(&v, &v, &p.Z) // v = dy^2+1
 
 	FeSquare(&v3, &v)
-	FeMul(&v3, &v3, &v)
+	FeMul(&v3, &v3, &v) // v3 = v^3
 	FeSquare(&p.X, &v3)
 	FeMul(&p.X, &p.X, &v)
-	FeMul(&p.X, &p.X, &u)
+	FeMul(&p.X, &p.X, &u) // x = uv^7
 
-	fePow22523(&p.X, &p.X)
+	fePow22523(&p.X, &p.X) // x = (uv^7)^((q-5)/8)
 	FeMul(&p.X, &p.X, &v3)
-	FeMul(&p.X, &p.X, &u)
+	FeMul(&p.X, &p.X, &u) // x = uv^3(uv^7)^((q-5)/8)
 
 	var tmpX, tmp2 [32]byte
 
 	FeSquare(&vxx, &p.X)
 	FeMul(&vxx, &vxx, &v)
-	FeSub(&check, &vxx, &u)
+	FeSub(&check, &vxx, &u) // vx^2-u
 	if FeIsNonZero(&check) == 1 {
-		FeAdd(&check, &vxx, &u)
+		FeAdd(&check, &vxx, &u) // vx^2+u
 		if FeIsNonZero(&check) == 1 {
 			return false
 		}
@@ -733,9 +873,13 @@ func slide(r *[256]int8, a *[32]byte) {
 	}
 }
 
+// GeDoubleScalarMultVartime sets r = a*A + b*B
+// where a = a[0]+256*a[1]+...+256^31 a[31].
+// and b = b[0]+256*b[1]+...+256^31 b[31].
+// B is the Ed25519 base point (x,4/5) with x positive.
 func GeDoubleScalarMultVartime(r *ProjectiveGroupElement, a *[32]byte, A *ExtendedGroupElement, b *[32]byte) {
 	var aSlide, bSlide [256]int8
-	var Ai [8]CachedGroupElement
+	var Ai [8]CachedGroupElement // A,3A,5A,7A,9A,11A,13A,15A
 	var t CompletedGroupElement
 	var u, A2 ExtendedGroupElement
 	var i int
@@ -784,12 +928,14 @@ func GeDoubleScalarMultVartime(r *ProjectiveGroupElement, a *[32]byte, A *Extend
 	}
 }
 
+// equal returns 1 if b == c and 0 otherwise.
 func equal(b, c int32) int32 {
 	x := uint32(b ^ c)
 	x--
 	return int32(x >> 31)
 }
 
+// negative returns 1 if b < 0 and 0 otherwise.
 func negative(b int32) int32 {
 	return (b >> 31) & 1
 }
@@ -815,6 +961,12 @@ func selectPoint(t *PreComputedGroupElement, pos int32, b int32) {
 	PreComputedGroupElementCMove(t, &minusT, bNegative)
 }
 
+// GeScalarMultBase computes h = a*B, where
+//   a = a[0]+256*a[1]+...+256^31 a[31]
+//   B is the Ed25519 base point (x,4/5) with x positive.
+//
+// Preconditions:
+//   a[31] <= 127
 func GeScalarMultBase(h *ExtendedGroupElement, a *[32]byte) {
 	var e [64]int8
 
@@ -823,6 +975,8 @@ func GeScalarMultBase(h *ExtendedGroupElement, a *[32]byte) {
 		e[2*i+1] = int8((v >> 4) & 15)
 	}
 
+	// each e[i] is between 0 and 15 and e[63] is between 0 and 7.
+
 	carry := int8(0)
 	for i := 0; i < 63; i++ {
 		e[i] += carry
@@ -830,6 +984,7 @@ func GeScalarMultBase(h *ExtendedGroupElement, a *[32]byte) {
 		e[i] -= carry << 4
 	}
 	e[63] += carry
+	// each e[i] is between -8 and 8.
 
 	h.Zero()
 	var t PreComputedGroupElement
@@ -858,6 +1013,16 @@ func GeScalarMultBase(h *ExtendedGroupElement, a *[32]byte) {
 	}
 }
 
+// The scalars are GF(2^252 + 27742317777372353535851937790883648493).
+
+// Input:
+//   a[0]+256*a[1]+...+256^31*a[31] = a
+//   b[0]+256*b[1]+...+256^31*b[31] = b
+//   c[0]+256*c[1]+...+256^31*c[31] = c
+//
+// Output:
+//   s[0]+256*s[1]+...+256^31*s[31] = (ab+c) mod l
+//   where l = 2^252 + 27742317777372353535851937790883648493.
 func ScMulAdd(s, a, b, c *[32]byte) {
 	a0 := 2097151 & load3(a[:])
 	a1 := 2097151 & (load4(a[2:]) >> 5)
@@ -1283,6 +1448,12 @@ func ScMulAdd(s, a, b, c *[32]byte) {
 	s[31] = byte(s11 >> 17)
 }
 
+// Input:
+//   s[0]+256*s[1]+...+256^63*s[63] = s
+//
+// Output:
+//   s[0]+256*s[1]+...+256^31*s[31] = s mod l
+//   where l = 2^252 + 27742317777372353535851937790883648493.
 func ScReduce(out *[32]byte, s *[64]byte) {
 	s0 := 2097151 & load3(s[:])
 	s1 := 2097151 & (load4(s[2:]) >> 5)

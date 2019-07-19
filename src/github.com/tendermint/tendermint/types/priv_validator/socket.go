@@ -17,71 +17,85 @@ import (
 )
 
 const (
-	defaultAcceptDeadlineSeconds	= 3
-	defaultConnDeadlineSeconds	= 3
-	defaultConnHeartBeatSeconds	= 30
-	defaultConnWaitSeconds		= 60
-	defaultDialRetries		= 10
+	defaultAcceptDeadlineSeconds = 3
+	defaultConnDeadlineSeconds   = 3
+	defaultConnHeartBeatSeconds  = 30
+	defaultConnWaitSeconds       = 60
+	defaultDialRetries           = 10
+)
+
+// Socket errors.
+var (
+	ErrDialRetryMax    = errors.New("dialed maximum retries")
+	ErrConnWaitTimeout = errors.New("waited for remote signer for too long")
+	ErrConnTimeout     = errors.New("remote signer timed out")
 )
 
 var (
-	ErrDialRetryMax		= errors.New("dialed maximum retries")
-	ErrConnWaitTimeout	= errors.New("waited for remote signer for too long")
-	ErrConnTimeout		= errors.New("remote signer timed out")
+	acceptDeadline = time.Second + defaultAcceptDeadlineSeconds
+	connDeadline   = time.Second * defaultConnDeadlineSeconds
+	connHeartbeat  = time.Second * defaultConnHeartBeatSeconds
 )
 
-var (
-	acceptDeadline	= time.Second + defaultAcceptDeadlineSeconds
-	connDeadline	= time.Second * defaultConnDeadlineSeconds
-	connHeartbeat	= time.Second * defaultConnHeartBeatSeconds
-)
-
+// SocketPVOption sets an optional parameter on the SocketPV.
 type SocketPVOption func(*SocketPV)
 
+// SocketPVAcceptDeadline sets the deadline for the SocketPV listener.
+// A zero time value disables the deadline.
 func SocketPVAcceptDeadline(deadline time.Duration) SocketPVOption {
 	return func(sc *SocketPV) { sc.acceptDeadline = deadline }
 }
 
+// SocketPVConnDeadline sets the read and write deadline for connections
+// from external signing processes.
 func SocketPVConnDeadline(deadline time.Duration) SocketPVOption {
 	return func(sc *SocketPV) { sc.connDeadline = deadline }
 }
 
+// SocketPVHeartbeat sets the period on which to check the liveness of the
+// connected Signer connections.
 func SocketPVHeartbeat(period time.Duration) SocketPVOption {
 	return func(sc *SocketPV) { sc.connHeartbeat = period }
 }
 
+// SocketPVConnWait sets the timeout duration before connection of external
+// signing processes are considered to be unsuccessful.
 func SocketPVConnWait(timeout time.Duration) SocketPVOption {
 	return func(sc *SocketPV) { sc.connWaitTimeout = timeout }
 }
 
+// SocketPV implements PrivValidator, it uses a socket to request signatures
+// from an external process.
 type SocketPV struct {
 	cmn.BaseService
 
-	addr		string
-	acceptDeadline	time.Duration
-	connDeadline	time.Duration
-	connHeartbeat	time.Duration
-	connWaitTimeout	time.Duration
-	privKey		crypto.PrivKeyEd25519
+	addr            string
+	acceptDeadline  time.Duration
+	connDeadline    time.Duration
+	connHeartbeat   time.Duration
+	connWaitTimeout time.Duration
+	privKey         crypto.PrivKeyEd25519
 
-	conn		net.Conn
-	listener	net.Listener
+	conn     net.Conn
+	listener net.Listener
 }
 
+// Check that SocketPV implements PrivValidator.
 var _ types.PrivValidator = (*SocketPV)(nil)
 
+// NewSocketPV returns an instance of SocketPV.
 func NewSocketPV(
 	logger log.Logger,
 	socketAddr string,
 	privKey crypto.PrivKeyEd25519,
 ) *SocketPV {
 	sc := &SocketPV{
-		addr:			socketAddr,
-		acceptDeadline:		acceptDeadline,
-		connDeadline:		connDeadline,
-		connHeartbeat:		connHeartbeat,
-		connWaitTimeout:	time.Second * defaultConnWaitSeconds,
-		privKey:		privKey,
+		addr:            socketAddr,
+		acceptDeadline:  acceptDeadline,
+		connDeadline:    connDeadline,
+		connHeartbeat:   connHeartbeat,
+		connWaitTimeout: time.Second * defaultConnWaitSeconds,
+		privKey:         privKey,
 	}
 
 	sc.BaseService = *cmn.NewBaseService(logger, "SocketPV", sc)
@@ -89,6 +103,7 @@ func NewSocketPV(
 	return sc
 }
 
+// GetAddress implements PrivValidator.
 func (sc *SocketPV) GetAddress() crypto.Address {
 	addr, err := sc.getAddress()
 	if err != nil {
@@ -98,15 +113,17 @@ func (sc *SocketPV) GetAddress() crypto.Address {
 	return addr
 }
 
+// Address is an alias for PubKey().Address().
 func (sc *SocketPV) getAddress() (crypto.Address, error) {
 	p, err := sc.getPubKey()
 	if err != nil {
 		return "", err
 	}
 
-	return p.Address(), nil
+	return p.Address(crypto.GetChainId()), nil
 }
 
+// GetPubKey implements PrivValidator.
 func (sc *SocketPV) GetPubKey() crypto.PubKey {
 	pubKey, err := sc.getPubKey()
 	if err != nil {
@@ -130,6 +147,7 @@ func (sc *SocketPV) getPubKey() (crypto.PubKey, error) {
 	return res.(*PubKeyMsg).PubKey, nil
 }
 
+// SignVote implements PrivValidator.
 func (sc *SocketPV) SignVote(chainID string, vote *types.Vote) error {
 	err := writeMsg(sc.conn, &SignVoteMsg{Vote: vote})
 	if err != nil {
@@ -146,6 +164,7 @@ func (sc *SocketPV) SignVote(chainID string, vote *types.Vote) error {
 	return nil
 }
 
+// SignProposal implements PrivValidator.
 func (sc *SocketPV) SignProposal(
 	chainID string,
 	proposal *types.Proposal,
@@ -165,6 +184,7 @@ func (sc *SocketPV) SignProposal(
 	return nil
 }
 
+// SignHeartbeat implements PrivValidator.
 func (sc *SocketPV) SignHeartbeat(
 	chainID string,
 	heartbeat *types.Heartbeat,
@@ -184,6 +204,7 @@ func (sc *SocketPV) SignHeartbeat(
 	return nil
 }
 
+// OnStart implements cmn.Service.
 func (sc *SocketPV) OnStart() error {
 	if err := sc.listen(); err != nil {
 		err = cmn.ErrorWrap(err, "failed to listen")
@@ -210,6 +231,7 @@ func (sc *SocketPV) OnStart() error {
 	return nil
 }
 
+// OnStop implements cmn.Service.
 func (sc *SocketPV) OnStop() {
 	if sc.conn != nil {
 		if err := sc.conn.Close(); err != nil {
@@ -236,7 +258,7 @@ func (sc *SocketPV) acceptConnection() (net.Conn, error) {
 	conn, err := sc.listener.Accept()
 	if err != nil {
 		if !sc.IsRunning() {
-			return nil, nil
+			return nil, nil // Ignore error from listener closing.
 		}
 		return nil, err
 
@@ -266,10 +288,12 @@ func (sc *SocketPV) listen() error {
 	return nil
 }
 
+// waitConnection uses the configured wait timeout to error if no external
+// process connects in the time period.
 func (sc *SocketPV) waitConnection() (net.Conn, error) {
 	var (
-		connc	= make(chan net.Conn, 1)
-		errc	= make(chan error, 1)
+		connc = make(chan net.Conn, 1)
+		errc  = make(chan error, 1)
 	)
 
 	go func(connc chan<- net.Conn, errc chan<- error) {
@@ -295,29 +319,37 @@ func (sc *SocketPV) waitConnection() (net.Conn, error) {
 	}
 }
 
+//---------------------------------------------------------
+
+// RemoteSignerOption sets an optional parameter on the RemoteSigner.
 type RemoteSignerOption func(*RemoteSigner)
 
+// RemoteSignerConnDeadline sets the read and write deadline for connections
+// from external signing processes.
 func RemoteSignerConnDeadline(deadline time.Duration) RemoteSignerOption {
 	return func(ss *RemoteSigner) { ss.connDeadline = deadline }
 }
 
+// RemoteSignerConnRetries sets the amount of attempted retries to connect.
 func RemoteSignerConnRetries(retries int) RemoteSignerOption {
 	return func(ss *RemoteSigner) { ss.connRetries = retries }
 }
 
+// RemoteSigner implements PrivValidator by dialing to a socket.
 type RemoteSigner struct {
 	cmn.BaseService
 
-	addr		string
-	chainID		string
-	connDeadline	time.Duration
-	connRetries	int
-	privKey		crypto.PrivKeyEd25519
-	privVal		types.PrivValidator
+	addr         string
+	chainID      string
+	connDeadline time.Duration
+	connRetries  int
+	privKey      crypto.PrivKeyEd25519
+	privVal      types.PrivValidator
 
-	conn	net.Conn
+	conn net.Conn
 }
 
+// NewRemoteSigner returns an instance of RemoteSigner.
 func NewRemoteSigner(
 	logger log.Logger,
 	chainID, socketAddr string,
@@ -325,12 +357,12 @@ func NewRemoteSigner(
 	privKey crypto.PrivKeyEd25519,
 ) *RemoteSigner {
 	rs := &RemoteSigner{
-		addr:		socketAddr,
-		chainID:	chainID,
-		connDeadline:	time.Second * defaultConnDeadlineSeconds,
-		connRetries:	defaultDialRetries,
-		privKey:	privKey,
-		privVal:	privVal,
+		addr:         socketAddr,
+		chainID:      chainID,
+		connDeadline: time.Second * defaultConnDeadlineSeconds,
+		connRetries:  defaultDialRetries,
+		privKey:      privKey,
+		privVal:      privVal,
 	}
 
 	rs.BaseService = *cmn.NewBaseService(logger, "RemoteSigner", rs)
@@ -338,6 +370,7 @@ func NewRemoteSigner(
 	return rs
 }
 
+// OnStart implements cmn.Service.
 func (rs *RemoteSigner) OnStart() error {
 	conn, err := rs.connect()
 	if err != nil {
@@ -351,6 +384,7 @@ func (rs *RemoteSigner) OnStart() error {
 	return nil
 }
 
+// OnStop implements cmn.Service.
 func (rs *RemoteSigner) OnStop() {
 	if rs.conn == nil {
 		return
@@ -363,7 +397,7 @@ func (rs *RemoteSigner) OnStop() {
 
 func (rs *RemoteSigner) connect() (net.Conn, error) {
 	for retries := rs.connRetries; retries > 0; retries-- {
-
+		// Don't sleep if it is the first retry.
 		if retries != rs.connRetries {
 			time.Sleep(rs.connDeadline)
 		}
@@ -409,7 +443,7 @@ func (rs *RemoteSigner) connect() (net.Conn, error) {
 func (rs *RemoteSigner) handleConnection(conn net.Conn) {
 	for {
 		if !rs.IsRunning() {
-			return
+			return // Ignore error from listener closing.
 		}
 
 		req, err := readMsg(conn)
@@ -453,6 +487,9 @@ func (rs *RemoteSigner) handleConnection(conn net.Conn) {
 	}
 }
 
+//---------------------------------------------------------
+
+// SocketPVMsg is sent between RemoteSigner and SocketPV.
 type SocketPVMsg interface{}
 
 func RegisterSocketPVMsg(cdc *amino.Codec) {
@@ -463,18 +500,22 @@ func RegisterSocketPVMsg(cdc *amino.Codec) {
 	cdc.RegisterConcrete(&SignHeartbeatMsg{}, "tendermint/socketpv/SignHeartbeatMsg", nil)
 }
 
+// PubKeyMsg is a PrivValidatorSocket message containing the public key.
 type PubKeyMsg struct {
 	PubKey crypto.PubKey
 }
 
+// SignVoteMsg is a PrivValidatorSocket message containing a vote.
 type SignVoteMsg struct {
 	Vote *types.Vote
 }
 
+// SignProposalMsg is a PrivValidatorSocket message containing a Proposal.
 type SignProposalMsg struct {
 	Proposal *types.Proposal
 }
 
+// SignHeartbeatMsg is a PrivValidatorSocket message containing a Heartbeat.
 type SignHeartbeatMsg struct {
 	Heartbeat *types.Heartbeat
 }

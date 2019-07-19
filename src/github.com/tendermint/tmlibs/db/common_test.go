@@ -10,6 +10,9 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+//----------------------------------------
+// Helper functions.
+
 func checkValue(t *testing.T, db DB, key []byte, valueWanted []byte) {
 	valueGot := db.Get(key)
 	assert.Equal(t, valueWanted, valueGot)
@@ -64,9 +67,14 @@ func newTempDB(t *testing.T, backend DBBackendType) (db DB) {
 	return db
 }
 
+//----------------------------------------
+// mockDB
+
+// NOTE: not actually goroutine safe.
+// If you want something goroutine safe, maybe you just want a MemDB.
 type mockDB struct {
-	mtx	sync.Mutex
-	calls	map[string]int
+	mtx   sync.Mutex
+	calls map[string]int
 }
 
 func newMockDB() *mockDB {
@@ -154,6 +162,9 @@ func (mdb *mockDB) Stats() map[string]string {
 	}
 	return res
 }
+
+//----------------------------------------
+// mockIterator
 
 type mockIterator struct{}
 

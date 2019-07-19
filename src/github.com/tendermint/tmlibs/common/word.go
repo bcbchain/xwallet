@@ -6,18 +6,18 @@ import (
 )
 
 var (
-	Zero256	= Word256{0}
-	One256	= Word256{1}
+	Zero256 = Word256{0}
+	One256  = Word256{1}
 )
 
 type Word256 [32]byte
 
-func (w Word256) String() string	{ return string(w[:]) }
-func (w Word256) TrimmedString() string	{ return TrimmedString(w.Bytes()) }
-func (w Word256) Copy() Word256		{ return w }
-func (w Word256) Bytes() []byte		{ return w[:] }
-func (w Word256) Prefix(n int) []byte	{ return w[:n] }
-func (w Word256) Postfix(n int) []byte	{ return w[32-n:] }
+func (w Word256) String() string        { return string(w[:]) }
+func (w Word256) TrimmedString() string { return TrimmedString(w.Bytes()) }
+func (w Word256) Copy() Word256         { return w }
+func (w Word256) Bytes() []byte         { return w[:] } // copied.
+func (w Word256) Prefix(n int) []byte   { return w[:n] }
+func (w Word256) Postfix(n int) []byte  { return w[32-n:] }
 func (w Word256) IsZero() bool {
 	accum := byte(0)
 	for _, byt := range w {
@@ -61,9 +61,11 @@ func Int64FromWord256(word Word256) int64 {
 	return GetInt64BE(buf)
 }
 
+//-------------------------------------
+
 type Tuple256 struct {
-	First	Word256
-	Second	Word256
+	First  Word256
+	Second Word256
 }
 
 func (tuple Tuple256) Compare(other Tuple256) int {
@@ -80,9 +82,9 @@ func Tuple256Split(t Tuple256) (Word256, Word256) {
 
 type Tuple256Slice []Tuple256
 
-func (p Tuple256Slice) Len() int	{ return len(p) }
+func (p Tuple256Slice) Len() int { return len(p) }
 func (p Tuple256Slice) Less(i, j int) bool {
 	return p[i].Compare(p[j]) < 0
 }
-func (p Tuple256Slice) Swap(i, j int)	{ p[i], p[j] = p[j], p[i] }
-func (p Tuple256Slice) Sort()		{ sort.Sort(p) }
+func (p Tuple256Slice) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p Tuple256Slice) Sort()         { sort.Sort(p) }

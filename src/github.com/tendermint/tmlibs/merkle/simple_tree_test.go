@@ -32,15 +32,18 @@ func TestSimpleProof(t *testing.T) {
 		t.Errorf("Unmatched root hashes: %X vs %X", rootHash, rootHash2)
 	}
 
+	// For each item, check the trail.
 	for i, item := range items {
 		itemHash := item.Hash()
 		proof := proofs[i]
 
+		// Verify success
 		ok := proof.Verify(i, total, itemHash, rootHash)
 		if !ok {
 			t.Errorf("Verification failed for index %v.", i)
 		}
 
+		// Wrong item index should make it fail
 		{
 			ok = proof.Verify((i+1)%total, total, itemHash, rootHash)
 			if ok {
@@ -48,6 +51,7 @@ func TestSimpleProof(t *testing.T) {
 			}
 		}
 
+		// Trail too long should make it fail
 		origAunts := proof.Aunts
 		proof.Aunts = append(proof.Aunts, cmn.RandBytes(32))
 		{
@@ -58,6 +62,7 @@ func TestSimpleProof(t *testing.T) {
 		}
 		proof.Aunts = origAunts
 
+		// Trail too short should make it fail
 		proof.Aunts = proof.Aunts[0 : len(proof.Aunts)-1]
 		{
 			ok = proof.Verify(i, total, itemHash, rootHash)
@@ -67,11 +72,13 @@ func TestSimpleProof(t *testing.T) {
 		}
 		proof.Aunts = origAunts
 
+		// Mutating the itemHash should make it fail.
 		ok = proof.Verify(i, total, MutateByteSlice(itemHash), rootHash)
 		if ok {
 			t.Errorf("Expected verification to fail for mutated leaf hash")
 		}
 
+		// Mutating the rootHash should make it fail.
 		ok = proof.Verify(i, total, itemHash, MutateByteSlice(rootHash))
 		if ok {
 			t.Errorf("Expected verification to fail for mutated root hash")

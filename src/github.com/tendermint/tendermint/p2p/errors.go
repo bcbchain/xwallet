@@ -6,13 +6,13 @@ import (
 )
 
 var (
-	ErrSwitchDuplicatePeer	= errors.New("Duplicate peer")
-	ErrSwitchConnectToSelf	= errors.New("Connect to self")
+	ErrSwitchDuplicatePeer = errors.New("Duplicate peer")
+	ErrSwitchConnectToSelf = errors.New("Connect to self")
 )
 
 type ErrSwitchAuthenticationFailure struct {
-	Dialed	*NetAddress
-	Got	ID
+	Dialed *NetAddress
+	Got    ID
 }
 
 func (e ErrSwitchAuthenticationFailure) Error() string {

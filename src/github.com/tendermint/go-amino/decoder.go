@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+//----------------------------------------
+// Signed
+
 func DecodeInt8(bz []byte) (i int8, n int, err error) {
 	var i64 = int64(0)
 	i64, n, err = DecodeVarint(bz)
@@ -66,6 +69,9 @@ func DecodeVarint(bz []byte) (i int64, n int, err error) {
 	}
 	return
 }
+
+//----------------------------------------
+// Unsigned
 
 func DecodeByte(bz []byte) (b byte, n int, err error) {
 	return DecodeUint8(bz)
@@ -129,6 +135,9 @@ func DecodeUvarint(bz []byte) (u uint64, n int, err error) {
 	return
 }
 
+//----------------------------------------
+// Other
+
 func DecodeBool(bz []byte) (b bool, n int, err error) {
 	const size int = 1
 	if len(bz) < size {
@@ -147,6 +156,7 @@ func DecodeBool(bz []byte) (b bool, n int, err error) {
 	return
 }
 
+// NOTE: UNSAFE
 func DecodeFloat32(bz []byte) (f float32, n int, err error) {
 	const size int = 4
 	if len(bz) < size {
@@ -159,6 +169,7 @@ func DecodeFloat32(bz []byte) (f float32, n int, err error) {
 	return
 }
 
+// NOTE: UNSAFE
 func DecodeFloat64(bz []byte) (f float64, n int, err error) {
 	const size int = 8
 	if len(bz) < size {
@@ -171,9 +182,18 @@ func DecodeFloat64(bz []byte) (f float64, n int, err error) {
 	return
 }
 
+// DecodeTime decodes seconds (int64) and nanoseconds (int32) since January 1,
+// 1970 UTC, and returns the corresponding time.  If nanoseconds is not in the
+// range [0, 999999999], or if seconds is too large, the behavior is
+// undefined.
+// TODO return error if behavior is undefined.
 func DecodeTime(bz []byte) (t time.Time, n int, err error) {
 
-	{
+	// TODO: This is a temporary measure until we support MarshalAmino/UnmarshalAmino.
+	// Basically, MarshalAmino on time should return a struct.
+	// This is how that struct would be encoded.
+
+	{ // Decode field number 1 and Typ3 (8Byte).
 		var fieldNum, typ, _n = uint32(0), Typ3(0x00), int(0)
 		fieldNum, typ, _n, err = decodeFieldNumberAndTyp3(bz)
 		if slide(&bz, &n, _n) && err != nil {
@@ -188,14 +208,14 @@ func DecodeTime(bz []byte) (t time.Time, n int, err error) {
 			return
 		}
 	}
-
+	// Actually read the Int64.
 	var sec, _n = int64(0), int(0)
 	sec, _n, err = DecodeInt64(bz)
 	if slide(&bz, &n, _n) && err != nil {
 		return
 	}
 
-	{
+	{ // Decode field number 2 and Typ3 (4Byte).
 		var fieldNum, typ, _n = uint32(0), Typ3(0x00), int(0)
 		fieldNum, typ, _n, err = decodeFieldNumberAndTyp3(bz)
 		if slide(&bz, &n, _n) && err != nil {
@@ -210,18 +230,18 @@ func DecodeTime(bz []byte) (t time.Time, n int, err error) {
 			return
 		}
 	}
-
+	// Actually read the Int32.
 	var nsec = int32(0)
 	nsec, _n, err = DecodeInt32(bz)
 	if slide(&bz, &n, _n) && err != nil {
 		return
 	}
-
+	// Validation check.
 	if nsec < 0 || 999999999 < nsec {
 		err = fmt.Errorf("Invalid time, nanoseconds out of bounds %v", nsec)
 		return
 	}
-	{
+	{ // Expect "StructTerm" Typ3 byte.
 		var typ, _n = Typ3(0x00), int(0)
 		typ, _n, err = decodeTyp3(bz)
 		if slide(&bz, &n, _n) && err != nil {
@@ -232,9 +252,9 @@ func DecodeTime(bz []byte) (t time.Time, n int, err error) {
 			return
 		}
 	}
-
+	// Construct time.
 	t = time.Unix(sec, int64(nsec))
-
+	// Strip timezone and monotonic for deep equality.
 	t = t.UTC().Truncate(0)
 	return
 }

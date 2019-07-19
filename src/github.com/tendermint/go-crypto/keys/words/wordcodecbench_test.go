@@ -51,7 +51,7 @@ func benchMakeWords(b *testing.B, codec *WordCodec) {
 }
 
 func benchParseWords(b *testing.B, codec *WordCodec) {
-
+	// generate a valid test string to parse
 	numBytes := 32
 	data := cmn.RandBytes(numBytes)
 	words, err := codec.BytesToWords(data)

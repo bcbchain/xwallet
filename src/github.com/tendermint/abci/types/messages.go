@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	maxMsgSize = 104857600
+	maxMsgSize = 104857600 // 100MB
 )
 
+// WriteMessage writes a varint length-delimited protobuf message.
 func WriteMessage(msg proto.Message, w io.Writer) error {
 	bz, err := proto.Marshal(msg)
 	if err != nil {
@@ -20,12 +21,13 @@ func WriteMessage(msg proto.Message, w io.Writer) error {
 	return encodeByteSlice(w, bz)
 }
 
+// ReadMessage reads a varint length-delimited protobuf message.
 func ReadMessage(r io.Reader, msg proto.Message) error {
 	return readProtoMsg(r, msg, maxMsgSize)
 }
 
 func readProtoMsg(r io.Reader, msg proto.Message, maxSize int) error {
-
+	// binary.ReadVarint takes an io.ByteReader, eg. a bufio.Reader
 	reader, ok := r.(*bufio.Reader)
 	if !ok {
 		reader = bufio.NewReader(r)
@@ -45,6 +47,10 @@ func readProtoMsg(r io.Reader, msg proto.Message, maxSize int) error {
 	return proto.Unmarshal(buf, msg)
 }
 
+//-----------------------------------------------------------------------
+// NOTE: we copied wire.EncodeByteSlice from go-wire rather than keep
+// go-wire as a dep
+
 func encodeByteSlice(w io.Writer, bz []byte) (err error) {
 	err = encodeVarint(w, int64(len(bz)))
 	if err != nil {
@@ -60,6 +66,8 @@ func encodeVarint(w io.Writer, i int64) (err error) {
 	_, err = w.Write(buf[0:n])
 	return
 }
+
+//----------------------------------------
 
 func ToRequestEcho(message string) *Request {
 	return &Request{
@@ -126,6 +134,8 @@ func ToRequestEndBlock(req RequestEndBlock) *Request {
 		Value: &Request_EndBlock{&req},
 	}
 }
+
+//----------------------------------------
 
 func ToResponseException(errStr string) *Response {
 	return &Response{

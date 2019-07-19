@@ -18,6 +18,7 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
+	// Make a bunch of requests
 	counter := 0
 	for i := 0; ; i++ {
 		req := types.ToRequestEcho("foobar")
@@ -35,6 +36,7 @@ func main() {
 func makeRequest(conn net.Conn, req *types.Request) (*types.Response, error) {
 	var bufWriter = bufio.NewWriter(conn)
 
+	// Write desired request
 	err := types.WriteMessage(req, bufWriter)
 	if err != nil {
 		return nil, err
@@ -48,6 +50,7 @@ func makeRequest(conn net.Conn, req *types.Request) (*types.Response, error) {
 		return nil, err
 	}
 
+	// Read desired response
 	var res = &types.Response{}
 	err = types.ReadMessage(conn, res)
 	if err != nil {

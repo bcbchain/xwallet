@@ -9,18 +9,19 @@ import (
 )
 
 type BitArray struct {
-	mtx	sync.Mutex
-	Bits	int		`json:"bits"`
-	Elems	[]uint64	`json:"elems"`
+	mtx   sync.Mutex
+	Bits  int      `json:"bits"`  // NOTE: persisted via reflect, must be exported
+	Elems []uint64 `json:"elems"` // NOTE: persisted via reflect, must be exported
 }
 
+// There is no BitArray whose Size is 0.  Use nil instead.
 func NewBitArray(bits int) *BitArray {
 	if bits <= 0 {
 		return nil
 	}
 	return &BitArray{
-		Bits:	bits,
-		Elems:	make([]uint64, (bits+63)/64),
+		Bits:  bits,
+		Elems: make([]uint64, (bits+63)/64),
 	}
 }
 
@@ -31,6 +32,7 @@ func (bA *BitArray) Size() int {
 	return bA.Bits
 }
 
+// NOTE: behavior is undefined if i >= bA.Bits
 func (bA *BitArray) GetIndex(i int) bool {
 	if bA == nil {
 		return false
@@ -47,6 +49,7 @@ func (bA *BitArray) getIndex(i int) bool {
 	return bA.Elems[i/64]&(uint64(1)<<uint(i%64)) > 0
 }
 
+// NOTE: behavior is undefined if i >= bA.Bits
 func (bA *BitArray) SetIndex(i int, v bool) bool {
 	if bA == nil {
 		return false
@@ -81,8 +84,8 @@ func (bA *BitArray) copy() *BitArray {
 	c := make([]uint64, len(bA.Elems))
 	copy(c, bA.Elems)
 	return &BitArray{
-		Bits:	bA.Bits,
-		Elems:	c,
+		Bits:  bA.Bits,
+		Elems: c,
 	}
 }
 
@@ -90,11 +93,12 @@ func (bA *BitArray) copyBits(bits int) *BitArray {
 	c := make([]uint64, (bits+63)/64)
 	copy(c, bA.Elems)
 	return &BitArray{
-		Bits:	bits,
-		Elems:	c,
+		Bits:  bits,
+		Elems: c,
 	}
 }
 
+// Returns a BitArray of larger bits size.
 func (bA *BitArray) Or(o *BitArray) *BitArray {
 	if bA == nil && o == nil {
 		return nil
@@ -114,6 +118,7 @@ func (bA *BitArray) Or(o *BitArray) *BitArray {
 	return c
 }
 
+// Returns a BitArray of smaller bit size.
 func (bA *BitArray) And(o *BitArray) *BitArray {
 	if bA == nil || o == nil {
 		return nil
@@ -133,7 +138,7 @@ func (bA *BitArray) and(o *BitArray) *BitArray {
 
 func (bA *BitArray) Not() *BitArray {
 	if bA == nil {
-		return nil
+		return nil // Degenerate
 	}
 	bA.mtx.Lock()
 	defer bA.mtx.Unlock()
@@ -146,7 +151,7 @@ func (bA *BitArray) Not() *BitArray {
 
 func (bA *BitArray) Sub(o *BitArray) *BitArray {
 	if bA == nil || o == nil {
-
+		// TODO: Decide if we should do 1's complement here?
 		return nil
 	}
 	bA.mtx.Lock()
@@ -159,18 +164,18 @@ func (bA *BitArray) Sub(o *BitArray) *BitArray {
 		i := len(o.Elems) - 1
 		if i >= 0 {
 			for idx := i * 64; idx < o.Bits; idx++ {
-
+				// NOTE: each individual GetIndex() call to o is safe.
 				c.setIndex(idx, c.getIndex(idx) && !o.GetIndex(idx))
 			}
 		}
 		return c
 	}
-	return bA.and(o.Not())
+	return bA.and(o.Not()) // Note degenerate case where o == nil
 }
 
 func (bA *BitArray) IsEmpty() bool {
 	if bA == nil {
-		return true
+		return true // should this be opposite?
 	}
 	bA.mtx.Lock()
 	defer bA.mtx.Unlock()
@@ -189,12 +194,14 @@ func (bA *BitArray) IsFull() bool {
 	bA.mtx.Lock()
 	defer bA.mtx.Unlock()
 
+	// Check all elements except the last
 	for _, elem := range bA.Elems[:len(bA.Elems)-1] {
 		if (^elem) != 0 {
 			return false
 		}
 	}
 
+	// Check that the last element has (lastElemBits) 1's
 	lastElemBits := (bA.Bits+63)%64 + 1
 	lastElem := bA.Elems[len(bA.Elems)-1]
 	return (lastElem+1)&((uint64(1)<<uint(lastElemBits))-1) == 0
@@ -226,7 +233,7 @@ func (bA *BitArray) PickRandom() (int, bool) {
 				PanicSanity("should not happen")
 			}
 		} else {
-
+			// Special case for last elem, to ignore straggler bits
 			elemBits := bA.Bits % 64
 			if elemBits == 0 {
 				elemBits = 64
@@ -243,6 +250,12 @@ func (bA *BitArray) PickRandom() (int, bool) {
 	return 0, false
 }
 
+// String returns a string representation of BitArray: BA{<bit-string>},
+// where <bit-string> is a sequence of 'x' (1) and '_' (0).
+// The <bit-string> includes spaces and newlines to help people.
+// For a simple sequence of 'x' and '_' characters with no spaces or newlines,
+// see the MarshalJSON() method.
+// Example: "BA{_x_}" or "nil-BitArray" for nil.
 func (bA *BitArray) String() string {
 	return bA.StringIndented("")
 }
@@ -296,6 +309,9 @@ func (bA *BitArray) Bytes() []byte {
 	return bytes
 }
 
+// NOTE: other bitarray o is not locked when reading,
+// so if necessary, caller must copy or lock o prior to calling Update.
+// If bA is nil, does nothing.
 func (bA *BitArray) Update(o *BitArray) {
 	if bA == nil || o == nil {
 		return
@@ -306,6 +322,8 @@ func (bA *BitArray) Update(o *BitArray) {
 	copy(bA.Elems, o.Elems)
 }
 
+// MarshalJSON implements json.Marshaler interface by marshaling bit array
+// using a custom format: a string of '-' or 'x' where 'x' denotes the 1 bit.
 func (bA *BitArray) MarshalJSON() ([]byte, error) {
 	if bA == nil {
 		return []byte("null"), nil
@@ -328,21 +346,26 @@ func (bA *BitArray) MarshalJSON() ([]byte, error) {
 
 var bitArrayJSONRegexp = regexp.MustCompile(`\A"([_x]*)"\z`)
 
+// UnmarshalJSON implements json.Unmarshaler interface by unmarshaling a custom
+// JSON description.
 func (bA *BitArray) UnmarshalJSON(bz []byte) error {
 	b := string(bz)
 	if b == "null" {
-
+		// This is required e.g. for encoding/json when decoding
+		// into a pointer with pre-allocated BitArray.
 		bA.Bits = 0
 		bA.Elems = nil
 		return nil
 	}
 
+	// Validate 'b'.
 	match := bitArrayJSONRegexp.FindStringSubmatch(b)
 	if match == nil {
 		return fmt.Errorf("BitArray in JSON should be a string of format %q but got %s", bitArrayJSONRegexp.String(), b)
 	}
 	bits := match[1]
 
+	// Construct new BitArray and copy over.
 	numBits := len(bits)
 	bA2 := NewBitArray(numBits)
 	for i := 0; i < numBits; i++ {

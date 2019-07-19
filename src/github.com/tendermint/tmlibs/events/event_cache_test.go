@@ -11,12 +11,12 @@ func TestEventCache_Flush(t *testing.T) {
 	evsw := NewEventSwitch()
 	evsw.Start()
 	evsw.AddListenerForEvent("nothingness", "", func(data EventData) {
-
+		// Check we are not initialising an empty buffer full of zeroed eventInfos in the EventCache
 		require.FailNow(t, "We should never receive a message on this switch since none are fired")
 	})
 	evc := NewEventCache(evsw)
 	evc.Flush()
-
+	// Check after reset
 	evc.Flush()
 	fail := true
 	pass := false

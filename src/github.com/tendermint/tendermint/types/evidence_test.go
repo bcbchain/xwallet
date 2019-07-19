@@ -7,19 +7,19 @@ import (
 )
 
 type voteData struct {
-	vote1	*Vote
-	vote2	*Vote
-	valid	bool
+	vote1 *Vote
+	vote2 *Vote
+	valid bool
 }
 
 func makeVote(val PrivValidator, chainID string, valIndex int, height int64, round, step int, blockID BlockID) *Vote {
 	v := &Vote{
-		ValidatorAddress:	val.GetAddress(),
-		ValidatorIndex:		valIndex,
-		Height:			height,
-		Round:			round,
-		Type:			byte(step),
-		BlockID:		blockID,
+		ValidatorAddress: val.GetAddress(),
+		ValidatorIndex:   valIndex,
+		Height:           height,
+		Round:            round,
+		Type:             byte(step),
+		BlockID:          blockID,
 	}
 	err := val.SignVote(chainID, v)
 	if err != nil {
@@ -46,24 +46,24 @@ func TestEvidence(t *testing.T) {
 	}
 
 	cases := []voteData{
-		{vote1, makeVote(val, chainID, 0, 10, 2, 1, blockID2), true},
+		{vote1, makeVote(val, chainID, 0, 10, 2, 1, blockID2), true}, // different block ids
 		{vote1, makeVote(val, chainID, 0, 10, 2, 1, blockID3), true},
 		{vote1, makeVote(val, chainID, 0, 10, 2, 1, blockID4), true},
-		{vote1, makeVote(val, chainID, 0, 10, 2, 1, blockID), false},
-		{vote1, makeVote(val, "mychain2", 0, 10, 2, 1, blockID2), false},
-		{vote1, makeVote(val, chainID, 1, 10, 2, 1, blockID2), false},
-		{vote1, makeVote(val, chainID, 0, 11, 2, 1, blockID2), false},
-		{vote1, makeVote(val, chainID, 0, 10, 3, 1, blockID2), false},
-		{vote1, makeVote(val, chainID, 0, 10, 2, 2, blockID2), false},
-		{vote1, makeVote(val2, chainID, 0, 10, 2, 1, blockID), false},
-		{vote1, badVote, false},
+		{vote1, makeVote(val, chainID, 0, 10, 2, 1, blockID), false},     // wrong block id
+		{vote1, makeVote(val, "mychain2", 0, 10, 2, 1, blockID2), false}, // wrong chain id
+		{vote1, makeVote(val, chainID, 1, 10, 2, 1, blockID2), false},    // wrong val index
+		{vote1, makeVote(val, chainID, 0, 11, 2, 1, blockID2), false},    // wrong height
+		{vote1, makeVote(val, chainID, 0, 10, 3, 1, blockID2), false},    // wrong round
+		{vote1, makeVote(val, chainID, 0, 10, 2, 2, blockID2), false},    // wrong step
+		{vote1, makeVote(val2, chainID, 0, 10, 2, 1, blockID), false},    // wrong validator
+		{vote1, badVote, false},                                          // signed by wrong key
 	}
 
 	for _, c := range cases {
 		ev := &DuplicateVoteEvidence{
-			PubKey:	val.GetPubKey(),
-			VoteA:	c.vote1,
-			VoteB:	c.vote2,
+			PubKey: val.GetPubKey(),
+			VoteA:  c.vote1,
+			VoteB:  c.vote2,
 		}
 		if c.valid {
 			assert.Nil(t, ev.Verify(chainID), "evidence should be valid")

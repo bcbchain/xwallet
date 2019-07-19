@@ -5,6 +5,9 @@ import (
 	"github.com/tendermint/abci/types"
 )
 
+//----------------------------------------------------------------------------------------
+// Enforce which abci msgs can be sent on a connection at the type level
+
 type AppConnConsensus interface {
 	SetResponseCallback(abcicli.Callback)
 	Error() error
@@ -33,7 +36,12 @@ type AppConnQuery interface {
 	EchoSync(string) (*types.ResponseEcho, error)
 	InfoSync(types.RequestInfo) (*types.ResponseInfo, error)
 	QuerySync(types.RequestQuery) (*types.ResponseQuery, error)
+
+	//	SetOptionSync(key string, value string) (res types.Result)
 }
+
+//-----------------------------------------------------------------------------------------
+// Implements AppConnConsensus (subset of abcicli.Client)
 
 type appConnConsensus struct {
 	appConn abcicli.Client
@@ -73,6 +81,9 @@ func (app *appConnConsensus) CommitSync() (*types.ResponseCommit, error) {
 	return app.appConn.CommitSync()
 }
 
+//------------------------------------------------
+// Implements AppConnMempool (subset of abcicli.Client)
+
 type appConnMempool struct {
 	appConn abcicli.Client
 }
@@ -102,6 +113,9 @@ func (app *appConnMempool) FlushSync() error {
 func (app *appConnMempool) CheckTxAsync(tx []byte) *abcicli.ReqRes {
 	return app.appConn.CheckTxAsync(tx)
 }
+
+//------------------------------------------------
+// Implements AppConnQuery (subset of abcicli.Client)
 
 type appConnQuery struct {
 	appConn abcicli.Client

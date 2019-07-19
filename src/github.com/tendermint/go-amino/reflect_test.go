@@ -15,6 +15,9 @@ import (
 	"github.com/tendermint/go-amino/tests"
 )
 
+//-------------------------------------
+// Non-interface Google fuzz tests
+
 func TestCodecStruct(t *testing.T) {
 	for _, ptr := range tests.StructTypes {
 		rt := getTypeFromPointer(ptr)
@@ -58,6 +61,7 @@ func _testCodec(t *testing.T, rt reflect.Type, codecType string) {
 	for i := 0; i < 1e4; i++ {
 		f.Fuzz(ptr)
 
+		// Reset, which makes debugging decoding easier.
 		rv2 = reflect.New(rt)
 		ptr2 = rv2.Interface()
 
@@ -91,9 +95,12 @@ func _testCodec(t *testing.T, rt reflect.Type, codecType string) {
 	}
 }
 
+//----------------------------------------
+// Register/interface tests
+
 func TestCodecBinaryRegister1(t *testing.T) {
 	cdc := NewCodec()
-
+	//cdc.RegisterInterface((*tests.Interface1)(nil), nil)
 	cdc.RegisterConcrete((*tests.Concrete1)(nil), "Concrete1", nil)
 
 	bz, err := cdc.MarshalBinaryBare(struct{ tests.Interface1 }{tests.Concrete1{}})
@@ -138,7 +145,7 @@ func TestCodecBinaryRegister4(t *testing.T) {
 
 func TestCodecBinaryRegister5(t *testing.T) {
 	cdc := NewCodec()
-
+	//cdc.RegisterConcrete((*tests.Concrete1)(nil), "Concrete1", nil)
 	cdc.RegisterInterface((*tests.Interface1)(nil), nil)
 
 	bz, err := cdc.MarshalBinaryBare(struct{ tests.Interface1 }{tests.Concrete1{}})
@@ -162,14 +169,14 @@ func TestCodecBinaryRegister7(t *testing.T) {
 	cdc.RegisterConcrete((*tests.Concrete1)(nil), "Concrete1", nil)
 	cdc.RegisterConcrete((*tests.Concrete2)(nil), "Concrete2", nil)
 
-	{
+	{ // test tests.Concrete1, no conflict.
 		bz, err := cdc.MarshalBinaryBare(struct{ tests.Interface1 }{tests.Concrete1{}})
 		assert.Nil(t, err, "correctly registered")
 		assert.Equal(t, []byte{0x0f, 0xe3, 0xda, 0xb8, 0x33, 0x04, 0x04}, bz,
 			"disfix bytes did not match")
 	}
 
-	{
+	{ // test tests.Concrete2, no conflict
 		bz, err := cdc.MarshalBinaryBare(struct{ tests.Interface1 }{tests.Concrete2{}})
 		assert.Nil(t, err, "correctly registered")
 		assert.Equal(t, []byte{0x0f, 0x6a, 0x9, 0xca, 0x3, 0x04, 0x04}, bz,
@@ -177,6 +184,7 @@ func TestCodecBinaryRegister7(t *testing.T) {
 	}
 }
 
+// Serialize and deserialize a non-nil interface value.
 func TestCodecBinaryRegister8(t *testing.T) {
 	cdc := NewCodec()
 	cdc.RegisterInterface((*tests.Interface1)(nil), nil)
@@ -200,6 +208,7 @@ func TestCodecBinaryRegister8(t *testing.T) {
 	assert.Equal(t, c3, i1)
 }
 
+// Like TestCodecBinaryRegister8, but JSON.
 func TestCodecJSONRegister8(t *testing.T) {
 	cdc := NewCodec()
 	cdc.RegisterInterface((*tests.Interface1)(nil), nil)
@@ -208,6 +217,8 @@ func TestCodecJSONRegister8(t *testing.T) {
 	var c3 tests.Concrete3
 	copy(c3[:], []byte("0123"))
 
+	// NOTE: We don't wrap c3...
+	// But that's OK, JSON still writes the disfix bytes by default.
 	bz, err := cdc.MarshalJSON(c3)
 	assert.Nil(t, err)
 	assert.Equal(t, []byte(`{"type":"43FAF453372100","value":"MDEyMw=="}`),
@@ -219,6 +230,7 @@ func TestCodecJSONRegister8(t *testing.T) {
 	assert.Equal(t, c3, i1)
 }
 
+// Like TestCodecBinaryRegister8, but serialize the concrete value directly.
 func TestCodecBinaryRegister9(t *testing.T) {
 	cdc := NewCodec()
 	cdc.RegisterInterface((*tests.Interface1)(nil), nil)
@@ -242,6 +254,7 @@ func TestCodecBinaryRegister9(t *testing.T) {
 	assert.Equal(t, c3, i1)
 }
 
+// Like TestCodecBinaryRegister8 but read into concrete var.
 func TestCodecBinaryRegister10(t *testing.T) {
 	cdc := NewCodec()
 	cdc.RegisterInterface((*tests.Interface1)(nil), nil)
@@ -277,13 +290,17 @@ func TestCodecBinaryStructFieldNilInterface(t *testing.T) {
 	require.Equal(t, i1, i2, "i1 and i2 should be the same after decoding")
 }
 
+//----------------------------------------
+// Misc.
+
 func spw(o interface{}) string {
 	return spew.Sprintf("%#v", o)
 }
 
 var fuzzFuncs = []interface{}{
 	func(s **string, c fuzz.Continue) {
-
+		// Prefer nil instead of empty, for deep equality.
+		// (go-amino decoder will always prefer nil).
 		s_ := randString(c)
 		if len(s_) == 0 {
 			*s = nil
@@ -292,7 +309,8 @@ var fuzzFuncs = []interface{}{
 		}
 	},
 	func(bz **[]byte, c fuzz.Continue) {
-
+		// Prefer nil instead of empty, for deep equality.
+		// (go-amino decoder will always prefer nil).
 		var bz_ []byte
 		c.Fuzz(&bz_)
 		if len(bz_) == 0 {
@@ -302,7 +320,7 @@ var fuzzFuncs = []interface{}{
 		}
 	},
 	func(tyme *time.Time, c fuzz.Continue) {
-
+		// Set time.Unix(_,_) to wipe .wal
 		switch c.Intn(4) {
 		case 0:
 			ns := c.Int63n(10)
@@ -311,7 +329,7 @@ var fuzzFuncs = []interface{}{
 			ns := c.Int63n(1e10)
 			*tyme = time.Unix(0, ns)
 		case 2:
-			const maxSeconds = 4611686018
+			const maxSeconds = 4611686018 // (1<<63 - 1) / 1e9
 			s := c.Int63n(maxSeconds)
 			ns := c.Int63n(1e10)
 			*tyme = time.Unix(s, ns)
@@ -320,10 +338,11 @@ var fuzzFuncs = []interface{}{
 			ns := c.Int63n(1e10)
 			*tyme = time.Unix(s, ns)
 		}
-
+		// Strip timezone and monotonic for deep equality.
 		*tyme = tyme.UTC().Truncate(time.Millisecond)
 	},
 
+	// For testing nested pointers...
 	func(ptr **byte, c fuzz.Continue) {
 		if c.Intn(5) == 0 {
 			*ptr = nil
@@ -350,21 +369,30 @@ var fuzzFuncs = []interface{}{
 	},
 }
 
+//----------------------------------------
+// From https://github.com/google/gofuzz/blob/master/fuzz.go
+// (Apache2.0 License)
+// TODO move to tmlibs/common/random.go?
+
 type charRange struct {
 	first, last rune
 }
 
+// choose returns a random unicode character from the given range, using the
+// given randomness source.
 func (r *charRange) choose(rand fuzz.Continue) rune {
 	count := int64(r.last - r.first)
 	return r.first + rune(rand.Int63n(count))
 }
 
 var unicodeRanges = []charRange{
-	{' ', '~'},
-	{'\u00a0', '\u02af'},
-	{'\u4e00', '\u9fff'},
+	{' ', '~'},           // ASCII characters
+	{'\u00a0', '\u02af'}, // Multi-byte encoded characters
+	{'\u4e00', '\u9fff'}, // Common CJK (even longer encodings)
 }
 
+// randString makes a random string up to 20 characters long. The returned string
+// may include a variety of (valid) UTF-8 encodings.
 func randString(r fuzz.Continue) string {
 	n := r.Intn(19) + 1
 	runes := make([]rune, n)

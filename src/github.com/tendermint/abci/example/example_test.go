@@ -39,6 +39,7 @@ func TestGRPC(t *testing.T) {
 func testStream(t *testing.T, app types.Application) {
 	numDeliverTxs := 200000
 
+	// Start the listener
 	server := abciserver.NewSocketServer("unix://test.sock", app)
 	server.SetLogger(log.TestingLogger().With("module", "abci-server"))
 	if err := server.Start(); err != nil {
@@ -46,6 +47,7 @@ func testStream(t *testing.T, app types.Application) {
 	}
 	defer server.Stop()
 
+	// Connect to the socket
 	client := abcicli.NewSocketClient("unix://test.sock", false)
 	client.SetLogger(log.TestingLogger().With("module", "abci-client"))
 	if err := client.Start(); err != nil {
@@ -56,7 +58,7 @@ func testStream(t *testing.T, app types.Application) {
 	done := make(chan struct{})
 	counter := 0
 	client.SetResponseCallback(func(req *types.Request, res *types.Response) {
-
+		// Process response
 		switch r := res.Value.(type) {
 		case *types.Response_DeliverTx:
 			counter++
@@ -68,33 +70,40 @@ func testStream(t *testing.T, app types.Application) {
 			}
 			if counter == numDeliverTxs {
 				go func() {
-					time.Sleep(time.Second * 2)
+					time.Sleep(time.Second * 2) // Wait for a bit to allow counter overflow
 					close(done)
 				}()
 				return
 			}
 		case *types.Response_Flush:
-
+			// ignore
 		default:
 			t.Error("Unexpected response type", reflect.TypeOf(res.Value))
 		}
 	})
 
+	// Write requests
 	for counter := 0; counter < numDeliverTxs; counter++ {
-
+		// Send request
 		reqRes := client.DeliverTxAsync([]byte("test"))
 		_ = reqRes
+		// check err ?
 
+		// Sometimes send flush messages
 		if counter%123 == 0 {
 			client.FlushAsync()
-
+			// check err ?
 		}
 	}
 
+	// Send final flush message
 	client.FlushAsync()
 
 	<-done
 }
+
+//-------------------------
+// test grpc
 
 func dialerFunc(addr string, timeout time.Duration) (net.Conn, error) {
 	return cmn.Connect(addr)
@@ -103,6 +112,7 @@ func dialerFunc(addr string, timeout time.Duration) (net.Conn, error) {
 func testGRPCSync(t *testing.T, app *types.GRPCApplication) {
 	numDeliverTxs := 2000
 
+	// Start the listener
 	server := abciserver.NewGRPCServer("unix://test.sock", app)
 	server.SetLogger(log.TestingLogger().With("module", "abci-server"))
 	if err := server.Start(); err != nil {
@@ -110,6 +120,7 @@ func testGRPCSync(t *testing.T, app *types.GRPCApplication) {
 	}
 	defer server.Stop()
 
+	// Connect to the socket
 	conn, err := grpc.Dial("unix://test.sock", grpc.WithInsecure(), grpc.WithDialer(dialerFunc))
 	if err != nil {
 		t.Fatalf("Error dialing GRPC server: %v", err.Error())
@@ -118,8 +129,9 @@ func testGRPCSync(t *testing.T, app *types.GRPCApplication) {
 
 	client := types.NewABCIApplicationClient(conn)
 
+	// Write requests
 	for counter := 0; counter < numDeliverTxs; counter++ {
-
+		// Send request
 		response, err := client.DeliverTx(context.Background(), &types.RequestDeliverTx{[]byte("test")})
 		if err != nil {
 			t.Fatalf("Error in GRPC DeliverTx: %v", err.Error())
@@ -134,7 +146,7 @@ func testGRPCSync(t *testing.T, app *types.GRPCApplication) {
 		t.Log("response", counter)
 		if counter == numDeliverTxs {
 			go func() {
-				time.Sleep(time.Second * 2)
+				time.Sleep(time.Second * 2) // Wait for a bit to allow counter overflow
 			}()
 		}
 

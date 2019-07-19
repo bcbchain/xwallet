@@ -70,6 +70,8 @@ func MaxUint(a, b uint) uint {
 	return b
 }
 
+//-----------------------------------------------------------------------------
+
 func MinInt8(a, b int8) int8 {
 	if a < b {
 		return a
@@ -139,6 +141,8 @@ func MinUint(a, b uint) uint {
 	}
 	return b
 }
+
+//-----------------------------------------------------------------------------
 
 func ExpUint64(a, b uint64) uint64 {
 	accum := uint64(1)

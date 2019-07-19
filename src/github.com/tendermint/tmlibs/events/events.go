@@ -1,3 +1,6 @@
+/*
+Pub-Sub in go with event caching
+*/
 package events
 
 import (
@@ -6,13 +9,19 @@ import (
 	cmn "github.com/tendermint/tmlibs/common"
 )
 
+// Generic event data can be typed and registered with tendermint/go-amino
+// via concrete implementation of this interface
 type EventData interface {
+	//AssertIsEventData()
 }
 
+// reactors and other modules should export
+// this interface to become eventable
 type Eventable interface {
 	SetEventSwitch(evsw EventSwitch)
 }
 
+// an event switch or cache implements fireable
 type Fireable interface {
 	FireEvent(event string, data EventData)
 }
@@ -29,9 +38,9 @@ type EventSwitch interface {
 type eventSwitch struct {
 	cmn.BaseService
 
-	mtx		sync.RWMutex
-	eventCells	map[string]*eventCell
-	listeners	map[string]*eventListener
+	mtx        sync.RWMutex
+	eventCells map[string]*eventCell
+	listeners  map[string]*eventListener
 }
 
 func NewEventSwitch() EventSwitch {
@@ -56,7 +65,7 @@ func (evsw *eventSwitch) OnStop() {
 }
 
 func (evsw *eventSwitch) AddListenerForEvent(listenerID, event string, cb EventCallback) {
-
+	// Get/Create eventCell and listener
 	evsw.mtx.Lock()
 	eventCell := evsw.eventCells[event]
 	if eventCell == nil {
@@ -70,12 +79,13 @@ func (evsw *eventSwitch) AddListenerForEvent(listenerID, event string, cb EventC
 	}
 	evsw.mtx.Unlock()
 
+	// Add event and listener
 	eventCell.AddListener(listenerID, cb)
 	listener.AddEvent(event)
 }
 
 func (evsw *eventSwitch) RemoveListener(listenerID string) {
-
+	// Get and remove listener
 	evsw.mtx.RLock()
 	listener := evsw.listeners[listenerID]
 	evsw.mtx.RUnlock()
@@ -87,6 +97,7 @@ func (evsw *eventSwitch) RemoveListener(listenerID string) {
 	delete(evsw.listeners, listenerID)
 	evsw.mtx.Unlock()
 
+	// Remove callback for each event.
 	listener.SetRemoved()
 	for _, event := range listener.GetEvents() {
 		evsw.RemoveListenerForEvent(event, listenerID)
@@ -94,7 +105,7 @@ func (evsw *eventSwitch) RemoveListener(listenerID string) {
 }
 
 func (evsw *eventSwitch) RemoveListenerForEvent(event string, listenerID string) {
-
+	// Get eventCell
 	evsw.mtx.Lock()
 	eventCell := evsw.eventCells[event]
 	evsw.mtx.Unlock()
@@ -103,22 +114,24 @@ func (evsw *eventSwitch) RemoveListenerForEvent(event string, listenerID string)
 		return
 	}
 
+	// Remove listenerID from eventCell
 	numListeners := eventCell.RemoveListener(listenerID)
 
+	// Maybe garbage collect eventCell.
 	if numListeners == 0 {
-
-		evsw.mtx.Lock()
-		eventCell.mtx.Lock()
+		// Lock again and double check.
+		evsw.mtx.Lock()      // OUTER LOCK
+		eventCell.mtx.Lock() // INNER LOCK
 		if len(eventCell.listeners) == 0 {
 			delete(evsw.eventCells, event)
 		}
-		eventCell.mtx.Unlock()
-		evsw.mtx.Unlock()
+		eventCell.mtx.Unlock() // INNER LOCK
+		evsw.mtx.Unlock()      // OUTER LOCK
 	}
 }
 
 func (evsw *eventSwitch) FireEvent(event string, data EventData) {
-
+	// Get the eventCell
 	evsw.mtx.RLock()
 	eventCell := evsw.eventCells[event]
 	evsw.mtx.RUnlock()
@@ -127,12 +140,16 @@ func (evsw *eventSwitch) FireEvent(event string, data EventData) {
 		return
 	}
 
+	// Fire event for all listeners in eventCell
 	eventCell.FireEvent(data)
 }
 
+//-----------------------------------------------------------------------------
+
+// eventCell handles keeping track of listener callbacks for a given event.
 type eventCell struct {
-	mtx		sync.RWMutex
-	listeners	map[string]EventCallback
+	mtx       sync.RWMutex
+	listeners map[string]EventCallback
 }
 
 func newEventCell() *eventCell {
@@ -163,21 +180,23 @@ func (cell *eventCell) FireEvent(data EventData) {
 	cell.mtx.RUnlock()
 }
 
+//-----------------------------------------------------------------------------
+
 type EventCallback func(data EventData)
 
 type eventListener struct {
-	id	string
+	id string
 
-	mtx	sync.RWMutex
-	removed	bool
-	events	[]string
+	mtx     sync.RWMutex
+	removed bool
+	events  []string
 }
 
 func newEventListener(id string) *eventListener {
 	return &eventListener{
-		id:		id,
-		removed:	false,
-		events:		nil,
+		id:      id,
+		removed: false,
+		events:  nil,
 	}
 }
 

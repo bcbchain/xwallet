@@ -15,11 +15,11 @@ func init() {
 		panic(err)
 	}
 	testProposal = &Proposal{
-		Height:			12345,
-		Round:			23456,
-		BlockPartsHeader:	PartSetHeader{111, []byte("blockparts")},
-		POLRound:		-1,
-		Timestamp:		stamp,
+		Height:           12345,
+		Round:            23456,
+		BlockPartsHeader: PartSetHeader{111, []byte("blockparts")},
+		POLRound:         -1,
+		Timestamp:        stamp,
 	}
 }
 
@@ -48,18 +48,22 @@ func TestProposalVerifySignature(t *testing.T) {
 	prop := NewProposal(4, 2, PartSetHeader{777, []byte("proper")}, 2, BlockID{})
 	signBytes := prop.SignBytes("test_chain_id")
 
+	// sign it
 	err := privVal.SignProposal("test_chain_id", prop)
 	require.NoError(t, err)
 
+	// verify the same proposal
 	valid := pubKey.VerifyBytes(signBytes, prop.Signature)
 	require.True(t, valid)
 
+	// serialize, deserialize and verify again....
 	newProp := new(Proposal)
 	bs, err := cdc.MarshalBinary(prop)
 	require.NoError(t, err)
 	err = cdc.UnmarshalBinary(bs, &newProp)
 	require.NoError(t, err)
 
+	// verify the transmitted proposal
 	newSignBytes := newProp.SignBytes("test_chain_id")
 	require.Equal(t, string(signBytes), string(newSignBytes))
 	valid = pubKey.VerifyBytes(newSignBytes, newProp.Signature)

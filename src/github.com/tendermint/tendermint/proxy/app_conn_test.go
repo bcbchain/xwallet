@@ -12,6 +12,8 @@ import (
 	"github.com/tendermint/tmlibs/log"
 )
 
+//----------------------------------------
+
 type AppConnTest interface {
 	EchoAsync(string) *abcicli.ReqRes
 	FlushSync() error
@@ -38,12 +40,15 @@ func (app *appConnTest) InfoSync(req types.RequestInfo) (*types.ResponseInfo, er
 	return app.appConn.InfoSync(req)
 }
 
+//----------------------------------------
+
 var SOCKET = "socket"
 
 func TestEcho(t *testing.T) {
 	sockPath := cmn.Fmt("unix:///tmp/echo_%v.sock", cmn.RandStr(6))
 	clientCreator := NewRemoteClientCreator(sockPath, SOCKET, true)
 
+	// Start server
 	s := server.NewSocketServer(sockPath, kvstore.NewKVStoreApplication())
 	s.SetLogger(log.TestingLogger().With("module", "abci-server"))
 	if err := s.Start(); err != nil {
@@ -51,6 +56,7 @@ func TestEcho(t *testing.T) {
 	}
 	defer s.Stop()
 
+	// Start client
 	cli, err := clientCreator.NewABCIClient()
 	if err != nil {
 		t.Fatalf("Error creating ABCI client: %v", err.Error())
@@ -72,10 +78,11 @@ func TestEcho(t *testing.T) {
 }
 
 func BenchmarkEcho(b *testing.B) {
-	b.StopTimer()
+	b.StopTimer() // Initialize
 	sockPath := cmn.Fmt("unix:///tmp/echo_%v.sock", cmn.RandStr(6))
 	clientCreator := NewRemoteClientCreator(sockPath, SOCKET, true)
 
+	// Start server
 	s := server.NewSocketServer(sockPath, kvstore.NewKVStoreApplication())
 	s.SetLogger(log.TestingLogger().With("module", "abci-server"))
 	if err := s.Start(); err != nil {
@@ -83,6 +90,7 @@ func BenchmarkEcho(b *testing.B) {
 	}
 	defer s.Stop()
 
+	// Start client
 	cli, err := clientCreator.NewABCIClient()
 	if err != nil {
 		b.Fatalf("Error creating ABCI client: %v", err.Error())
@@ -95,7 +103,7 @@ func BenchmarkEcho(b *testing.B) {
 	proxy := NewAppConnTest(cli)
 	b.Log("Connected")
 	echoString := strings.Repeat(" ", 200)
-	b.StartTimer()
+	b.StartTimer() // Start benchmarking tests
 
 	for i := 0; i < b.N; i++ {
 		proxy.EchoAsync(echoString)
@@ -105,13 +113,15 @@ func BenchmarkEcho(b *testing.B) {
 	}
 
 	b.StopTimer()
-
+	// info := proxy.InfoSync(types.RequestInfo{""})
+	//b.Log("N: ", b.N, info)
 }
 
 func TestInfo(t *testing.T) {
 	sockPath := cmn.Fmt("unix:///tmp/echo_%v.sock", cmn.RandStr(6))
 	clientCreator := NewRemoteClientCreator(sockPath, SOCKET, true)
 
+	// Start server
 	s := server.NewSocketServer(sockPath, kvstore.NewKVStoreApplication())
 	s.SetLogger(log.TestingLogger().With("module", "abci-server"))
 	if err := s.Start(); err != nil {
@@ -119,6 +129,7 @@ func TestInfo(t *testing.T) {
 	}
 	defer s.Stop()
 
+	// Start client
 	cli, err := clientCreator.NewABCIClient()
 	if err != nil {
 		t.Fatalf("Error creating ABCI client: %v", err.Error())

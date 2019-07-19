@@ -19,8 +19,8 @@ func InitChain(client abcicli.Client) error {
 		vals[i] = types.Validator{pubkey, uint64(power), "", ""}
 	}
 	_, err := client.InitChainSync(types.RequestInitChain{
-		Validators:	vals,
-		AppStateBytes:	[]byte("{}"),
+		Validators:    vals,
+		AppStateBytes: []byte("{}"),
 	})
 	if err != nil {
 		fmt.Printf("Failed test: InitChain - %v\n", err)
@@ -43,7 +43,7 @@ func SetOption(client abcicli.Client, key, value string) error {
 
 func Commit(client abcicli.Client, hashExp []byte) error {
 	res, err := client.CommitSync()
-	data := res.LastAppHash
+	data := res.GetLastAppHash()
 	if err != nil {
 		fmt.Println("Failed test: Commit")
 		fmt.Printf("error while committing: %v\n", err)

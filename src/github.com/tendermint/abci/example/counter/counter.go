@@ -12,9 +12,9 @@ import (
 type CounterApplication struct {
 	types.BaseApplication
 
-	hashCount	int
-	txCount		int
-	serial		bool
+	hashCount int
+	txCount   int
+	serial    bool
 }
 
 func NewCounterApplication(serial bool) *CounterApplication {
@@ -30,7 +30,13 @@ func (app *CounterApplication) SetOption(req types.RequestSetOption) types.Respo
 	if key == "serial" && value == "on" {
 		app.serial = true
 	} else {
-
+		/*
+			TODO Panic and have the ABCI server pass an exception.
+			The client can call SetOptionSync() and get an `error`.
+			return types.ResponseSetOption{
+				Error: cmn.Fmt("Unknown key (%s) or value (%s)", key, value),
+			}
+		*/
 		return types.ResponseSetOption{}
 	}
 
@@ -41,16 +47,16 @@ func (app *CounterApplication) DeliverTx(tx []byte) types.ResponseDeliverTx {
 	if app.serial {
 		if len(tx) > 8 {
 			return types.ResponseDeliverTx{
-				Code:	code.CodeTypeEncodingError,
-				Log:	fmt.Sprintf("Max tx size is 8 bytes, got %d", len(tx))}
+				Code: code.CodeTypeEncodingError,
+				Log:  fmt.Sprintf("Max tx size is 8 bytes, got %d", len(tx))}
 		}
 		tx8 := make([]byte, 8)
 		copy(tx8[len(tx8)-len(tx):], tx)
 		txValue := binary.BigEndian.Uint64(tx8)
 		if txValue != uint64(app.txCount) {
 			return types.ResponseDeliverTx{
-				Code:	code.CodeTypeBadNonce,
-				Log:	fmt.Sprintf("Invalid nonce. Expected %v, got %v", app.txCount, txValue)}
+				Code: code.CodeTypeBadNonce,
+				Log:  fmt.Sprintf("Invalid nonce. Expected %v, got %v", app.txCount, txValue)}
 		}
 	}
 	app.txCount++
@@ -61,16 +67,16 @@ func (app *CounterApplication) CheckTx(tx []byte) types.ResponseCheckTx {
 	if app.serial {
 		if len(tx) > 8 {
 			return types.ResponseCheckTx{
-				Code:	code.CodeTypeEncodingError,
-				Log:	fmt.Sprintf("Max tx size is 8 bytes, got %d", len(tx))}
+				Code: code.CodeTypeEncodingError,
+				Log:  fmt.Sprintf("Max tx size is 8 bytes, got %d", len(tx))}
 		}
 		tx8 := make([]byte, 8)
 		copy(tx8[len(tx8)-len(tx):], tx)
 		txValue := binary.BigEndian.Uint64(tx8)
 		if txValue < uint64(app.txCount) {
 			return types.ResponseCheckTx{
-				Code:	code.CodeTypeBadNonce,
-				Log:	fmt.Sprintf("Invalid nonce. Expected >= %v, got %v", app.txCount, txValue)}
+				Code: code.CodeTypeBadNonce,
+				Log:  fmt.Sprintf("Invalid nonce. Expected >= %v, got %v", app.txCount, txValue)}
 		}
 	}
 	return types.ResponseCheckTx{Code: code.CodeTypeOK}

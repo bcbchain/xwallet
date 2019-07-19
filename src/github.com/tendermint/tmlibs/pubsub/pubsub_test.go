@@ -182,13 +182,13 @@ func TestBufferCapacity(t *testing.T) {
 	}
 }
 
-func Benchmark10Clients(b *testing.B)	{ benchmarkNClients(10, b) }
-func Benchmark100Clients(b *testing.B)	{ benchmarkNClients(100, b) }
-func Benchmark1000Clients(b *testing.B)	{ benchmarkNClients(1000, b) }
+func Benchmark10Clients(b *testing.B)   { benchmarkNClients(10, b) }
+func Benchmark100Clients(b *testing.B)  { benchmarkNClients(100, b) }
+func Benchmark1000Clients(b *testing.B) { benchmarkNClients(1000, b) }
 
-func Benchmark10ClientsOneQuery(b *testing.B)	{ benchmarkNClientsOneQuery(10, b) }
-func Benchmark100ClientsOneQuery(b *testing.B)	{ benchmarkNClientsOneQuery(100, b) }
-func Benchmark1000ClientsOneQuery(b *testing.B)	{ benchmarkNClientsOneQuery(1000, b) }
+func Benchmark10ClientsOneQuery(b *testing.B)   { benchmarkNClientsOneQuery(10, b) }
+func Benchmark100ClientsOneQuery(b *testing.B)  { benchmarkNClientsOneQuery(100, b) }
+func Benchmark1000ClientsOneQuery(b *testing.B) { benchmarkNClientsOneQuery(1000, b) }
 
 func benchmarkNClients(n int, b *testing.B) {
 	s := pubsub.NewServer()
@@ -234,6 +234,10 @@ func benchmarkNClientsOneQuery(n int, b *testing.B) {
 		s.PublishWithTags(ctx, "Gamora", pubsub.NewTagMap(map[string]interface{}{"abci.Account.Owner": "Ivan", "abci.Invoices.Number": 1}))
 	}
 }
+
+///////////////////////////////////////////////////////////////////////////////
+/// HELPERS
+///////////////////////////////////////////////////////////////////////////////
 
 func assertReceive(t *testing.T, expected interface{}, ch <-chan interface{}, msgAndArgs ...interface{}) {
 	select {

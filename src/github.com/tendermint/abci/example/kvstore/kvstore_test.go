@@ -20,21 +20,23 @@ import (
 func testKVStore(t *testing.T, app types.Application, tx []byte, key, value string) {
 	ar := app.DeliverTx(tx)
 	require.False(t, ar.IsErr(), ar)
-
+	// repeating tx doesn't raise error
 	ar = app.DeliverTx(tx)
 	require.False(t, ar.IsErr(), ar)
 
+	// make sure query is fine
 	resQuery := app.Query(types.RequestQuery{
-		Path:	"/store",
-		Data:	[]byte(key),
+		Path: "/store",
+		Data: []byte(key),
 	})
 	require.Equal(t, code.CodeTypeOK, resQuery.Code)
 	require.Equal(t, value, string(resQuery.Value))
 
+	// make sure proof is fine
 	resQuery = app.Query(types.RequestQuery{
-		Path:	"/store",
-		Data:	[]byte(key),
-		Prove:	true,
+		Path:  "/store",
+		Data:  []byte(key),
+		Prove: true,
 	})
 	require.EqualValues(t, code.CodeTypeOK, resQuery.Code)
 	require.Equal(t, value, string(resQuery.Value))
@@ -53,7 +55,7 @@ func TestKVStoreKV(t *testing.T) {
 }
 
 func TestPersistentKVStoreKV(t *testing.T) {
-	dir, err := ioutil.TempDir("/tmp", "abci-kvstore-test")
+	dir, err := ioutil.TempDir("/tmp", "abci-kvstore-test") // TODO
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +71,7 @@ func TestPersistentKVStoreKV(t *testing.T) {
 }
 
 func TestPersistentKVStoreInfo(t *testing.T) {
-	dir, err := ioutil.TempDir("/tmp", "abci-kvstore-test")
+	dir, err := ioutil.TempDir("/tmp", "abci-kvstore-test") // TODO
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +84,7 @@ func TestPersistentKVStoreInfo(t *testing.T) {
 		t.Fatalf("expected height of %d, got %d", height, resInfo.LastBlockHeight)
 	}
 
+	// make and apply block
 	height = int64(1)
 	hash := []byte("foo")
 	header := types.Header{
@@ -98,17 +101,19 @@ func TestPersistentKVStoreInfo(t *testing.T) {
 
 }
 
+// add a validator, remove a validator, update a validator
 func TestValUpdates(t *testing.T) {
-	dir, err := ioutil.TempDir("/tmp", "abci-kvstore-test")
+	dir, err := ioutil.TempDir("/tmp", "abci-kvstore-test") // TODO
 	if err != nil {
 		t.Fatal(err)
 	}
 	kvstore := NewPersistentKVStoreApplication(dir)
 
+	// init with some validators
 	total := 10
 	nInit := 5
 	vals := RandVals(total)
-
+	// iniitalize with the first nInit
 	kvstore.InitChain(types.RequestInitChain{
 		Validators: vals[:nInit],
 	})
@@ -118,6 +123,7 @@ func TestValUpdates(t *testing.T) {
 
 	var v1, v2, v3 types.Validator
 
+	// add some validators
 	v1, v2 = vals[nInit], vals[nInit+1]
 	diff := []types.Validator{v1, v2}
 	tx1 := MakeValSetChangeTx(v1.PubKey, v1.Power)
@@ -128,6 +134,7 @@ func TestValUpdates(t *testing.T) {
 	vals1, vals2 = vals[:nInit+2], kvstore.Validators()
 	valsEqual(t, vals1, vals2)
 
+	// remove some validators
 	v1, v2, v3 = vals[nInit-2], vals[nInit-1], vals[nInit]
 	v1.Power = 0
 	v2.Power = 0
@@ -143,6 +150,7 @@ func TestValUpdates(t *testing.T) {
 	vals2 = kvstore.Validators()
 	valsEqual(t, vals1, vals2)
 
+	// update some validators
 	v1 = vals[0]
 	if v1.Power == 5 {
 		v1.Power = 6
@@ -161,7 +169,7 @@ func TestValUpdates(t *testing.T) {
 }
 
 func makeApplyBlock(t *testing.T, kvstore types.Application, heightInt int, diff []types.Validator, txs ...[]byte) {
-
+	// make and apply block
 	height := int64(heightInt)
 	hash := []byte("foo")
 	header := types.Header{
@@ -181,6 +189,7 @@ func makeApplyBlock(t *testing.T, kvstore types.Application, heightInt int, diff
 
 }
 
+// order doesn't matter
 func valsEqual(t *testing.T, vals1, vals2 []types.Validator) {
 	if len(vals1) != len(vals2) {
 		t.Fatalf("vals dont match in len. got %d, expected %d", len(vals2), len(vals1))
@@ -197,7 +206,7 @@ func valsEqual(t *testing.T, vals1, vals2 []types.Validator) {
 }
 
 func makeSocketClientServer(app types.Application, name string) (abcicli.Client, cmn.Service, error) {
-
+	// Start the listener
 	socket := cmn.Fmt("unix://%s.sock", name)
 	logger := log.TestingLogger()
 
@@ -207,6 +216,7 @@ func makeSocketClientServer(app types.Application, name string) (abcicli.Client,
 		return nil, nil, err
 	}
 
+	// Connect to the socket
 	client := abcicli.NewSocketClient(socket, false)
 	client.SetLogger(logger.With("module", "abci-client"))
 	if err := client.Start(); err != nil {
@@ -218,7 +228,7 @@ func makeSocketClientServer(app types.Application, name string) (abcicli.Client,
 }
 
 func makeGRPCClientServer(app types.Application, name string) (abcicli.Client, cmn.Service, error) {
-
+	// Start the listener
 	socket := cmn.Fmt("unix://%s.sock", name)
 	logger := log.TestingLogger()
 
@@ -239,7 +249,7 @@ func makeGRPCClientServer(app types.Application, name string) (abcicli.Client, c
 }
 
 func TestClientServer(t *testing.T) {
-
+	// set up socket app
 	kvstore := NewKVStoreApplication()
 	client, server, err := makeSocketClientServer(kvstore, "kvstore-socket")
 	require.Nil(t, err)
@@ -248,6 +258,7 @@ func TestClientServer(t *testing.T) {
 
 	runClientTests(t, client)
 
+	// set up grpc app
 	kvstore = NewKVStoreApplication()
 	gclient, gserver, err := makeGRPCClientServer(kvstore, "kvstore-grpc")
 	require.Nil(t, err)
@@ -258,7 +269,7 @@ func TestClientServer(t *testing.T) {
 }
 
 func runClientTests(t *testing.T, client abcicli.Client) {
-
+	// run some tests....
 	key := "abc"
 	value := key
 	tx := []byte(key)
@@ -273,23 +284,25 @@ func testClient(t *testing.T, app abcicli.Client, tx []byte, key, value string) 
 	ar, err := app.DeliverTxSync(tx)
 	require.NoError(t, err)
 	require.False(t, ar.IsErr(), ar)
-
+	// repeating tx doesn't raise error
 	ar, err = app.DeliverTxSync(tx)
 	require.NoError(t, err)
 	require.False(t, ar.IsErr(), ar)
 
+	// make sure query is fine
 	resQuery, err := app.QuerySync(types.RequestQuery{
-		Path:	"/store",
-		Data:	[]byte(key),
+		Path: "/store",
+		Data: []byte(key),
 	})
 	require.Nil(t, err)
 	require.Equal(t, code.CodeTypeOK, resQuery.Code)
 	require.Equal(t, value, string(resQuery.Value))
 
+	// make sure proof is fine
 	resQuery, err = app.QuerySync(types.RequestQuery{
-		Path:	"/store",
-		Data:	[]byte(key),
-		Prove:	true,
+		Path:  "/store",
+		Data:  []byte(key),
+		Prove: true,
 	})
 	require.Nil(t, err)
 	require.Equal(t, code.CodeTypeOK, resQuery.Code)
