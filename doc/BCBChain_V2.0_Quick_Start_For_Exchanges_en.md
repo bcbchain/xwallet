@@ -14,7 +14,7 @@
 
 ## 1.1 What is BCBChain
 
-BCBChain is a blockchain system based on Tendermint. It is a scalable platform with high stability, based on system security, technological innovation, fast and easy to use, and efficient data transmissions between object to object, and human to object.
+​	BCBChain is a blockchain system based on Tendermint. It is a scalable platform with high stability, based on system security, technological innovation, fast and easy to use, and efficient data transmissions between object to object, and human to object.
 
 For more details, please view 《BCBChain_V1.0_Program_Reference》.
 
@@ -22,7 +22,7 @@ For more details, please view 《BCBChain_V1.0_Program_Reference》.
 
 ## 1.2 Summary
 
-The procedures to connect BCBChain wallet assets to the exchange are as follows:
+​	The procedures to connect BCBChain wallet assets to the exchange are as follows:
 
 * bcbXwallet_rpc 
 
@@ -32,61 +32,57 @@ The procedures to connect BCBChain wallet assets to the exchange are as follows:
 
   The BCBChain Exchange Client is a command-line tool that provides easy access to the interface.
 
-The relationship of the abovementioned components are described as below.
+  The relationship of the abovementioned components are described as below.
 
 ![](./p10/basic2.png)
 
 
 <div STYLE="page-break-after: always;"></div>
-# 2 Software and Hardware Requirements
+<div STYLE="page-break-after: always;"></div
 
-**Operating System**：       CentOS 7 64 bit
+# 2 bcbXwallet Deployment
 
-**Hardware**：                      CPU 8core+，Memory16GB+，Harddisk512GB+
+## 2.1 Installation package download
 
-**Dependencies**：              NTP service installed 
-
-```
-[tmp]# sudo apt-get install ntp
-```
-
-
-
-<div STYLE="page-break-after: always;"></div>
-
-# 3 bcbXwallet Deployment
-
-## 3.1 Installation package download
-
-Download address：
+​	Download address：
 
 ```
-https://github.com/bcbchain/xwallet/releases/download/v1.0.12/bcb-Xwallet_1.0.12.10094-x64.tar.gz
+https://github.com/bcbchain/xwallet/releases
 ```
 
 
 
-## 3.2 Decompression Procedures
+## 2.2 Decompression Procedures
 
-Place the downloaded package in a temporary folder, then run the following command:
+​	Place the downloaded package in a temporary folder, then run the following command:
 
 ```
-[tmp]# tar xvf bcb-Xwallet_1.0.12.10094-x64.tar.gz
+[tmp]# tar xvf bcb-Xwallet_xxx-x64.tar.gz
 ```
 
  
 
-## 3.3 Launch Procedures
+## 2.3 Launch Procedures
 
-Enter “bcb-Xwallet_1.0.7.5443-x64” folder，run the following command：
+​	Enter the directory of "bcb-xwallet_xxx-x64 /. Config", modify the configuration file as required, and execute the command:
 
 ```
-[bcb-Xwallet_1.0.12.10094-x64.tar.gz]# ./bcbXwallet_rpc
+[.config]vi bcbXwallet.yaml
 ```
 
-After it is started, set the bcbXwallet_rpc listening port to：37657。You can change the listening port by modifying the file, "./.config/bcbXwallet.yaml".
 
-Enter the following command to check if bcb-Xwallet service is run correctly:
+
+​	Enter “bcb-Xwallet_1.0.7.5443-x64” folder，run the following command：
+
+```
+[bcb-Xwallet_xxx-x64]# ./bcbXwallet_rpc
+```
+
+
+
+​	After it is started, set the bcbXwallet_rpc listening port to：37657。You can change the listening port by modifying the file, "./.config/bcbXwallet.yaml".
+
+​	Enter the following command to check if bcb-Xwallet service is run correctly:
 
 ```
 [root]# netstat -lnp | grep 37657                                              
@@ -94,91 +90,18 @@ Enter the following command to check if bcb-Xwallet service is run correctly:
 
 <div STYLE="page-break-after: always;"></div>
 
-# 4 BCB Node Deployment
+# 3 Protocol
 
-## 4.1 Installation package download
+## 3.1 Protocol Overview
 
-Download address：
-
-```
-https://github.com/bcbchain/xwallet/releases/download/v1.0.12/bcb-node_1.0.17.12511.tar.gz
-```
-
-
-
-## 4.2 Decompression Procedures
-
-Place the downloaded package in a temporary folder, then run the following command:
-
-```
-[tmp]# tar xvf bcb-node_1.0.17.12511.tar.gz
-```
-
- 
-
-## 4.3 Install
-
-### 4.3.1 Install bcchain
-
-Enter “bcbchain_1.0.17.12511” folder，run the following command：
-
-```
-[bcbchain_1.0.17.12511]# ./install
-```
-
-### 4.3.2 Install tmcore
-
-Enter “tmcore_1.0.17.12511” folder，run the following command：
-
-```
-[tmcore_1.0.17.12511]# ./install                                         
-```
-
-Input: 1 (select bcb)；
-
-Input: 3 (select UNOFFICIAL FOLLOWER)；
-
-Input: earth.bcbchain.io, Wait a moment, tmcore will finish installing.
-
-Run the following command, and  if the screen displays the "last_block_height" information, it is successfully installed.
-
-```
-curl localhost:46657/abci_info
-```
-
-### 4.3.3 Sync block
-
-After bcchain and tmcore are successfully installed,  the node will synchronize the blocks. Since the block data is large, the sync block takes about 10 days. We also provide offline block packets. You can download and import, which can speed up the synchronization. The download link is: **http://211.154.140.124:43356/down/**. After downloading, you need put the data package into the specified directory and execute the following command to complete the data import.
-
-```
-systemctl stop tmcore.service
-systemctl stop bcbchain.service
-
-cd /home/tmcore/ && rm data -rf 
-tar xf tmcore_data_20190625.tar.gz
-
-cd /home/bcbchain/ && rm  .appstate.db -rf
-tar xf bcbchain_appstate.db_20190625.tar.gz
-
-systemctl start tmcore.service
-systemctl start bcbchain.service
-
-```
-
-
-
-# 5 Protocol
-
-## 5.1 Protocol Overview
-
-bcbXwallet_rpc server supports the the following PRC communication protocols:
+​	bcbXwallet_rpc server supports the the following PRC communication protocols:
 
 - URI over HTTPS
 - JSONRPC over HTTPS
 
-All RPC interfaces supported by the bcbXwallet_rpc server and their parameters can be obtained at: https://ip:port.
+  All RPC interfaces supported by the bcbXwallet_rpc server and their parameters can be obtained at: https://ip:port.
 
-The list of RPC interfaces provided by the bcbXwallet_rpc server is as follows (supports HTTPS, default port 37657):
+  The list of RPC interfaces provided by the bcbXwallet_rpc server is as follows (supports HTTPS, default port 37657):
 
 ![](./p10/bcbXwallet_rpc.png)
 
@@ -186,13 +109,13 @@ The list of RPC interfaces provided by the bcbXwallet_rpc server is as follows (
 
 <div STYLE="page-break-after: always;"></div>
 
-## 5.2 URI over HTTP
+## 3.2 URI over HTTP
 
-When using the HTTP GET method for RPC requests, the parameters must be URI-encoded. For the URL format of all RPC calls, see the list above. For details about each service and its parameters, refer to the following parts of this section.
+​	When using the HTTP GET method for RPC requests, the parameters must be URI-encoded. For the URL format of all RPC calls, see the list above. For details about each service and its parameters, refer to the following parts of this section.
 
-## 5.3 JSONRPC over HTTP
+## 3.3 JSONRPC over HTTP
 
-When using HTTP POST and JSONRPC application protocol for requests,  data body format is as follows:
+​	When using HTTP POST and JSONRPC application protocol for requests,  data body format is as follows:
 
 ```json
 Example：
@@ -206,9 +129,9 @@ Example：
 }
 ```
 
-Refer to the following parts of the section for in-depth information on the services and their parameters.
+​	Refer to the following parts of the section for in-depth information on the services and their parameters.
 
-General format of the return data of a successful request is as below:
+​	General format of the return data of a successful request is as below:
 
 ```
 {
@@ -241,17 +164,19 @@ General format of the return data of a failed request is as below (same for all 
 
 
 
-# 6 Programming Interface
+# 4 Programming Interface
 
 
 
-## 6.1 Wallet Management Interface
+## 4.1 Wallet Management Interface
 
 
 
-### 6.1.1 bcb_walletCreate
+### 4.1.1 bcb_walletCreate
 
 Sends a request to bcbXwallet_rpc service to create a new wallet.
+
+
 
 - **Request URI over HTTPS**
 
@@ -304,9 +229,11 @@ Sends a request to bcbXwallet_rpc service to create a new wallet.
 
 
 
-### 6.1.2 bcb_walletExport
+### 4.1.2 bcb_walletExport
 
-Sends a request to bcbXwallet_rpc to export a wallet.
+​	Sends a request to bcbXwallet_rpc to export a wallet.
+
+
 
 - **Request URI over HTTPS**
 
@@ -364,9 +291,11 @@ Sends a request to bcbXwallet_rpc to export a wallet.
 
 
 
-### 6.1.3 bcb_walletImport
+### 4.1.3 bcb_walletImport
 
-Sends a request to bcbXwallet_rpc  to import a new wallet.
+​	Sends a request to bcbXwallet_rpc  to import a new wallet.
+
+
 
 - **Request URI over HTTPS**
 
@@ -426,9 +355,9 @@ Sends a request to bcbXwallet_rpc  to import a new wallet.
 
 
 
-### 6.1.4 bcb_walletList
+### 4.1.4 bcb_walletList
 
-Sends a request to bcbXwallet_rpc  to list out all the wallet information
+​	Sends a request to bcbXwallet_rpc  to list out all the wallet information
 
 
 
@@ -491,9 +420,9 @@ Sends a request to bcbXwallet_rpc  to list out all the wallet information
 
 
 
-### 6.1.5 bcb_transfer
+### 4.1.5 bcb_transfer
 
-Sends a request to bcbXwallet_rpc  to request a single transfer
+​	Sends a request to bcbXwallet_rpc  to request a single transfer
 
 
 
@@ -567,9 +496,11 @@ Sends a request to bcbXwallet_rpc  to request a single transfer
 
 
 
-### 6.1.5 bcb_transferOffline
+### 4.1.5 bcb_transferOffline
 
-Sends a request to bcbXwallet_rpc  to transfer currency offline
+​	Sends a request to bcbXwallet_rpc  to transfer currency offline.
+
+
 
 - **Request URI over HTTPS**
 
@@ -623,7 +554,7 @@ Sends a request to bcbXwallet_rpc  to transfer currency offline
     "jsonrpc": "2.0",
     "id": "1",
     "result": {
-      "tx": "bcb<tx>.v1.AetboYAmy2TEyUbsR731FTLDLyHE1MVKsSd4v7hS1jFnNkrtmGEVxVmWHR3
+      "tx": "bcb<tx>.v2.AetboYAmy2TEyUbsR731FTLDLyHE1MVKsSd4v7hS1jFnNkrtmGEVxVmWHR3
       jVSUffxKgW7aPawnQaVrZ4gwMt6aogUAJjhvnukfPWnxmsybqDgdjgecjsXa94bamPqgPhTTZC9Sz
       b.<1>.YTgiA1gdDGi2L8iCryAn34dXVYKUEdmBxivyHbK57wKpBcX5KrKyn1vdmZTuKKZ7PotCjcb
       ASbesv61VLE8H38TDiopHrs2eHG9z9iEDDyLcN7giLPCgFiLN9LPRiYZgxwpR95echr2bRPbijnKW
@@ -642,13 +573,15 @@ Sends a request to bcbXwallet_rpc  to transfer currency offline
 
 
 
-## 6.2 Blockchain Interface
+## 4.2 Blockchain Interface
 
 
 
-### 6.2.1 bcb_blockHeight
+### 4.2.1 bcb_blockHeight
 
-Sends a request to bcbXwallet_rpc to query the latest block height.
+​	Sends a request to bcbXwallet_rpc to query the latest block height.
+
+
 
 - **Request URI over HTTPS**
 
@@ -694,9 +627,9 @@ Sends a request to bcbXwallet_rpc to query the latest block height.
 
 
 
-### 6.2.2 bcb_block
+### 4.2.2 bcb_block
 
-Sends a request to bcbXwallet_rpc  to query block data.
+​	Sends a request to bcbXwallet_rpc  to query block data.
 
 
 
@@ -755,11 +688,11 @@ Sends a request to bcbXwallet_rpc  to query block data.
         "nonce": 117510,
         "gasLimit": 2500,
         "fee": 1500000,
-        "note":"hello",
+        "note":"agree",
         "messages": [
           {
-           "smcAddress": "bcbLVgb3odTfKC9Y9GeFnNWL9wmR4pwWiqwe",
-           "smcName": "token-basic",
+           "smcAddress": "bcbCsRXXMGkUJ8wRnrBUD7mQsMST4d53JRKJ",
+           "smcName": ""token-templet-Diamond Coin",
            "method": "Transfer(smc.Address,big.Int)smc.Error",
            "to": "bcbKuqW1qdsnD7mRsRooXMEkCBj2s9GLF9pn",
            "value": "683000000000"
@@ -808,9 +741,9 @@ Sends a request to bcbXwallet_rpc  to query block data.
 
 
 
-### 6.2.3 bcb_transaction
+### 4.2.3 bcb_transaction
 
-Sends a request to bcbXwallet_rpc  to query a transaction details.
+​	Sends a request to bcbXwallet_rpc  to query a transaction details.
 
 
 
@@ -897,9 +830,9 @@ Sends a request to bcbXwallet_rpc  to query a transaction details.
 
 
 
-### 6.2.4 bcb_balance
+### 4.2.4 bcb_balance
 
-Sends a request to bcbXwallet_rpc  to check the balance of the account BCB currency.
+​	Sends a request to bcbXwallet_rpc  to check the balance of the account BCB currency.
 
 
 
@@ -950,9 +883,9 @@ Sends a request to bcbXwallet_rpc  to check the balance of the account BCB curre
 
 
 
-### 6.2.5 bcb_balanceOfToken
+### 4.2.5 bcb_balanceOfToken
 
-Sends a request to bcbXwallet_rpc  to check the balance of a token.
+​	Sends a request to bcbXwallet_rpc  to check the balance of a token.
 
 
 
@@ -1007,9 +940,9 @@ Sends a request to bcbXwallet_rpc  to check the balance of a token.
 
 
 
-### 6.2.6 bcb_allBalance
+### 4.2.6 bcb_allBalance
 
-Sends a request to bcbXwallet_rpc  to query all the tokens in an account.
+​	Sends a request to bcbXwallet_rpc  to query all the tokens in an account.
 
 
 
@@ -1071,9 +1004,11 @@ Sends a request to bcbXwallet_rpc  to query all the tokens in an account.
 
 
 
-### 6.2.7 bcb_nonce
+### 4.2.7 bcb_nonce
 
-Sends a request to bcbXwallet_rpc  to query the next transaction count value available on the blockchain for the account.
+​	Sends a request to bcbXwallet_rpc  to query the next transaction count value available on the blockchain for the account.
+
+
 
 - **Request URI over HTTPS**
 
@@ -1122,9 +1057,9 @@ Sends a request to bcbXwallet_rpc  to query the next transaction count value ava
 
 
 
-### 6.2.8 bcb_commitTx
+### 4.2.8 bcb_commitTx
 
-Sends a request to bcbXwallet_rpc  to commit a transaction.
+​	Sends a request to bcbXwallet_rpc  to commit a transaction.
 
 
 
@@ -1142,7 +1077,7 @@ Sends a request to bcbXwallet_rpc  to commit a transaction.
     "id": "dontcare/anything",
     "method": "bcb_commitTx",
     "params": {
-      "tx": "bcb<tx>.v1.AetboYAmy2TEyUbsR731FTLDLyHE1MVKsSd4v7hS1jFnNkrtmGEVxVmWHR
+      "tx": "bcb<tx>.v2.AetboYAmy2TEyUbsR731FTLDLyHE1MVKsSd4v7hS1jFnNkrtmGEVxVmWHR
       3jVSUffxKgW7aPawnQaVrZ4gwMt6aogUAJjhvnukfPWnxmsybqDgdjgecjsXa94bamPqgPhTTZC9
       Szb.<1>.YTgiA1gdDGi2L8iCryAn34dXVYKUEdmBxivyHbK57wKpBcX5KrKyn1vdmZTuKKZ7PotC
       jcbASbesv61VLE8H38TDiopHrs2eHG9z9iEDDyLcN7giLPCgFiLN9LPRiYZgxwpR95echr2bRPbi
@@ -1187,9 +1122,9 @@ Sends a request to bcbXwallet_rpc  to commit a transaction.
 
 
 
-### 6.2.9 bcb_version
+### 4.2.9 bcb_version
 
-Sends a request to bcbXwallet_rpc  to query the current version number.
+​	Sends a request to bcbXwallet_rpc  to query the current version number.
 
 
 
@@ -1237,15 +1172,15 @@ Sends a request to bcbXwallet_rpc  to query the current version number.
 
 
 
-# 7 bcbXwallet
+# 5 bcbXwallet
 
 
 
-bcbXwallet is a stand-alone command line program that provides a native call wrapper for the rpc interface. It is convenient for daily diagnosis and integration, and there is no need to construct a POST request.
+​	bcbXwallet is a stand-alone command line program that provides a native call wrapper for the rpc interface. It is convenient for daily diagnosis and integration, and there is no need to construct a POST request.
 
 
 
-## 7.1 Usage
+## 5.1 Usage
 
 The command runs in the following format:
 
@@ -1278,11 +1213,11 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-## 7.2 Command details
+## 5.2 Command details
 
 
 
-### 7.2.1 walletCreate
+### 5.2.1 walletCreate
 
 - **command**
 
@@ -1328,7 +1263,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.2 walletExport
+### 5.2.2 walletExport
 
 - **command**
 
@@ -1364,7 +1299,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.3 walletImport
+### 5.2.3 walletImport
 
 - **command**
 
@@ -1402,7 +1337,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.4 walletList
+### 5.2.4 walletList
 
 - **command**
 
@@ -1445,7 +1380,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.5 transfer
+### 5.2.5 transfer
 
 - **command**
 
@@ -1489,7 +1424,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.6 transferOffline
+### 5.2.6 transferOffline
 
 - **command**
 
@@ -1516,7 +1451,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
   ```
   {
-    "tx": "bcb<tx>.v1.AetboYAmy2TEyUbsR731FTLDLyHE1MVKsSd4v7hS1jFnNkrtmGEVxVmWHR3jVSU
+    "tx": "bcb<tx>.v2.AetboYAmy2TEyUbsR731FTLDLyHE1MVKsSd4v7hS1jFnNkrtmGEVxVmWHR3jVSU
     ffxKgW7aPawnQaVrZ4gwMt6aogUAJjhvnukfPWnxmsybqDgdjgecjsXa94bamPqgPhTTZC9Szb.<1>.YT
     giA1gdDGi2L8iCryAn34dXVYKUEdmBxivyHbK57wKpBcX5KrKyn1vdmZTuKKZ7PotCjcbASbesv61VLE8
     H38TDiopHrs2eHG9z9iEDDyLcN7giLPCgFiLN9LPRiYZgxwpR95echr2bRPbijnKWj" 
@@ -1531,7 +1466,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.7 blockHeight
+### 5.2.7 blockHeight
 
 - **command**
 
@@ -1561,7 +1496,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.8 block
+### 5.2.8 block
 
 - **command**
 
@@ -1654,7 +1589,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.9 transaction
+### 5.2.9 transaction
 
 - **command**
 
@@ -1726,7 +1661,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.10 balance
+### 5.2.10 balance
 
 - **command**
 
@@ -1757,7 +1692,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.11 balanceOfToken
+### 5.2.11 balanceOfToken
 
 - **command**
 
@@ -1791,7 +1726,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.12 allBalance
+### 5.2.12 allBalance
 
 - **command**
 
@@ -1833,7 +1768,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.13 nonce
+### 5.2.13 nonce
 
 - **command**
 
@@ -1864,12 +1799,12 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.14 commitTx
+### 5.2.14 commitTx
 
 - **command**
 
   ```
-  bcbXwallet commitTx --tx "bcb<tx>.v1.AetboY... [--url https://...]"
+  bcbXwallet commitTx --tx "bcb<tx>.v2.AetboY... [--url https://...]"
   ```
 
 - **Input Parameters**
@@ -1901,7 +1836,7 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-### 7.2.15 version
+### 5.2.15 version
 
 - **command**
 
@@ -1932,11 +1867,11 @@ Use "bcbXwallet [command] --help" for more information about a command.
 
 
 
-# 8 How to Rapidly Setup with the Exchange
+# 6 How to Rapidly Setup with the Exchange
 
 
 
-## 8.1 Setup using Address Labelling
+## 6.1 Setup using Address Labelling
 
 Setup using Address Labelling Explanation:
 
@@ -1959,7 +1894,7 @@ The process details are explained in the diagram below:
 
 
 
-## 8.2 Setup without using Address Labels
+## 6.2 Setup without using Address Labels
 
 **Setup without using address labels explanation:**
 When you don't use the address label feature about BCBChain, you can not distinguish the activities of the users in the account by the exchange hot wallet address. In this case, the user can only be identified by the address. Hence, every user needs to have one unique account and one unique corresponding address, and manually maintain the currencies in their accounts on a periodic basis by spreading the tokens and distributing the allocated tokens back to the hot wallet.
@@ -1976,7 +1911,7 @@ The process details are explained in the diagram below:
 
 
 
-## 8.3 Transfer from cold wallet to hot wallet
+## 6.3 Transfer from cold wallet to hot wallet
 
 **Transfer from cold wallet to hot wallet explanation:**
 

@@ -59,7 +59,7 @@ func NetInfo() (*ctypes.ResultNetInfo, error) {
 
 func isPrivate(peer p2p.Peer) bool {
 	for _, id := range privatePeerIDs {
-		if string(peer.NodeInfo().NetAddress().ID) == id {
+		if string(peer.NodeInfo().ID) == id {
 			return true
 		}
 	}

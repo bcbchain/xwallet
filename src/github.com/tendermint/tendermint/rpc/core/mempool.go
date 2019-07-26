@@ -228,7 +228,7 @@ func BroadcastTxCommit(tx types.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
 			Height:    deliverTxRes.Height,
 		}, nil
 	case <-timer.C:
-		logger.Error("failed to include tx")
+		logger.Error("Timed out waiting for transaction to be included in a block")
 		return &ctypes.ResultBroadcastTxCommit{
 			CheckTx:   *checkTxR,
 			DeliverTx: abci.ResponseDeliverTx{},

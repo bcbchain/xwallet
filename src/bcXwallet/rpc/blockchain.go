@@ -117,7 +117,7 @@ func transaction(txHash string, resultBlock *core_types.ResultBlock) (tx *TxResu
 		if hash[:2] == "0x" {
 			txHash = txHash[2:]
 		}
-		if txHash == hash {
+		if strings.ToLower(txHash) == hash {
 			txStr = string(resultBlock.Block.Txs[k])
 		}
 	}
